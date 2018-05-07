@@ -1,5 +1,5 @@
 /*
- * Copyright 2006-2010 the original author or authors.
+ * Copyright 2006-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,334 +16,316 @@
 
 package com.consol.citrus.report;
 
-import com.consol.citrus.TestCase;
 import com.consol.citrus.TestResult;
 import com.consol.citrus.exceptions.CitrusRuntimeException;
+import com.consol.citrus.util.FileUtils;
+import com.consol.citrus.util.PropertyUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
-import org.w3c.dom.*;
-import org.w3c.dom.bootstrap.DOMImplementationRegistry;
-import org.w3c.dom.ls.DOMImplementationLS;
-import org.w3c.dom.ls.LSSerializer;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.util.StringUtils;
 
-import java.io.IOException;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
-import java.util.HashMap;
-import java.util.Map;
+import java.io.*;
+import java.util.*;
 
 /**
- * {@link TestReporter} implementation that generates the famous JUnit XML reports. JUnit can
- * use these XML reports to generate HTML reports.
- *  
  * @author Christoph Deppisch
+ * @since 2.7.5
  */
-@SuppressWarnings("PMD.AvoidDuplicateLiterals")
-public class JUnitReporter implements TestSuiteListener, TestListener, TestReporter {
-    
-    /** Collect all test results */
-    private TestResults testResults = new TestResults();
-    
-    /** Result XML document */
-    private Document doc;
+public class JUnitReporter extends AbstractTestReporter {
 
-    /** Result element for testsuite */
-    private Element testSuiteElement;
-
-    /** Target output file */
-    private Resource outputFile = new FileSystemResource("target/test-output/test-results.xml");
-
-    /**
-     * Logger
-     */
+    /** Logger */
     private static Logger log = LoggerFactory.getLogger(JUnitReporter.class);
 
-    /** Track test execution time */
-    private Map<String, Long> testExecutionTime = new HashMap<String, Long>();
-    
-    /** Track overall execution time */
-    private Long overallExecutionTime = 0L;
+    /** Output directory */
+    @Value("${citrus.junit.report.directory:junitreports}")
+    private String outputDirectory = "junitreports";
 
-    /** Common decimal format for percentage calculation in report **/
-    private static DecimalFormat decFormat = new DecimalFormat("0.000");
+    /** Resulting test report file name */
+    @Value("${citrus.junit.report.file.pattern:TEST-%s.xml}")
+    private String reportFileNamePattern = "TEST-%s.xml";
 
-    static {
-        DecimalFormatSymbols symbol = new DecimalFormatSymbols();
-        symbol.setDecimalSeparator('.');
-        decFormat.setDecimalFormatSymbols(symbol);
-    }
-    
-    /**
-     * @see com.consol.citrus.report.TestReporter#clearTestResults()
-     */
-    public void clearTestResults() {
-        testResults = new TestResults();
-    }
+    /** Test suite name to use in report */
+    @Value("${citrus.junit.report.suite.name:TestSuite}")
+    private String suiteName = "TestSuite";
 
-    /**
-     * @see com.consol.citrus.report.TestReporter#generateTestResults()
-     */
+    /** Static resource for the summary test report template */
+    @Value("${citrus.junit.report.template:classpath:com/consol/citrus/report/junit-report.xml}")
+    private String reportTemplate = "classpath:com/consol/citrus/report/junit-report.xml";
+
+    /** Test result template */
+    @Value("${citrus.junit.report.success.template:classpath:com/consol/citrus/report/junit-test.xml}")
+    private String successTemplate = "classpath:com/consol/citrus/report/junit-test.xml";
+
+    /** Test result template */
+    @Value("${citrus.junit.report.failed.template:classpath:com/consol/citrus/report/junit-test-failed.xml}")
+    private String failedTemplate = "classpath:com/consol/citrus/report/junit-test-failed.xml";
+
+    /** Enables/disables report generation */
+    @Value("${citrus.junit.report.enabled:true}")
+    private String enabled = Boolean.TRUE.toString();
+
+    @Override
     public void generateTestResults() {
-        try {
-            log.debug("Generating JUnit test results");
+        if (isEnabled()) {
+            ReportTemplates reportTemplates = new ReportTemplates();
 
-            DOMImplementationRegistry registry = DOMImplementationRegistry.newInstance();
-            DOMImplementationList domImplList = registry.getDOMImplementationList("LS");
+            log.debug("Generating JUnit test report");
 
-            if (log.isDebugEnabled()) {
-                for (int i = 0; i < domImplList.getLength(); i++) {
-                    log.debug("Found DOMImplementationLS: " + domImplList.item(i));
-                }
-            }
-            
-            DOMImplementationLS domImpl;
-            for (int i = 0; i < domImplList.getLength(); i++) {
-                try {
-                    domImpl = (DOMImplementationLS)domImplList.item(i);
-
-                    if (log.isDebugEnabled()) {
-                        log.debug("Using DOMSerializerImpl: " + domImpl.getClass().getName());
-                    }
-
-                    LSSerializer serializer = domImpl.createLSSerializer();
-
-                    if (log.isDebugEnabled()) {
-                        log.debug("Using LSSerializer: " + serializer.getClass().getName());
-                    }
-
-                    if (serializer.getDomConfig().canSetParameter("format-pretty-print", true)) {
-                        if (log.isDebugEnabled()) {
-                            log.debug("Setting parameter format-pretty-print " + true);
-                        }
-                        serializer.getDomConfig().setParameter("format-pretty-print", true);
-                    }
-
-                    if (!outputFile.exists()) {
-                        boolean success = outputFile.getFile().getParentFile().mkdirs();
-                        
-                        if (!success) {
-                            throw new CitrusRuntimeException("Unable to create folder structure for JUnit report");
-                        }
-                        
-                        outputFile.createRelative("");
-                    }
-                    
-                    if (log.isDebugEnabled()) {
-                        log.debug("Serializing to file " + outputFile.getFile().toURI().toString());
-                    }
-
-                    serializer.writeToURI(doc, outputFile.getFile().toURI().toString());
-                } catch(RuntimeException e) {
-                    log.error("Error during report generation", e);
-                    continue;
-                }
-
-                break;
-            }
-
-            log.info("Generated JUnit test results");
-            if (log.isDebugEnabled()) {
-                log.debug("OutputFile is: " + outputFile.getFile().getPath());
-            }
-        } catch (IOException e) {
-            log.error("Error during report generation", e);
-        } catch (ClassCastException e) {
-            log.error("Error during report generation", e);
-        } catch (ClassNotFoundException e) {
-            log.error("Error during report generation", e);
-        } catch (InstantiationException e) {
-            log.error("Error during report generation", e);
-        } catch (IllegalAccessException e) {
-            log.error("Error during report generation", e);
-        } finally {
             try {
-                outputFile.getInputStream().close();
-            } catch (IOException ex) {
-                log.error("Error while closing file", ex);
+                List<TestResult> results = getTestResults().asList();
+                createReportFile(String.format(reportFileNamePattern, suiteName), createReportContent(suiteName, results, reportTemplates), new File(getReportDirectory()));
+
+                Map<String, List<TestResult>> groupedResults = new HashMap<>();
+                for(TestResult result : results) {
+                    if (!groupedResults.containsKey(result.getClassName())) {
+                        groupedResults.put(result.getClassName(), new ArrayList<>());
+                    }
+
+                    groupedResults.get(result.getClassName()).add(result);
+                }
+
+                File targetDirectory = new File(getReportDirectory() + (StringUtils.hasText(outputDirectory) ? File.separator + outputDirectory : ""));
+                for (Map.Entry<String, List<TestResult>> resultEntry : groupedResults.entrySet()) {
+                    createReportFile(String.format(reportFileNamePattern, resultEntry.getKey()), createReportContent(resultEntry.getKey(), resultEntry.getValue(), reportTemplates), targetDirectory);
+                }
+            } catch (IOException e) {
+                throw new CitrusRuntimeException("Failed to generate JUnit test report", e);
             }
         }
     }
 
     /**
-     * @see com.consol.citrus.report.TestListener#onTestFailure(com.consol.citrus.TestCase, java.lang.Throwable)
+     * Create report file for test class.
+     * @param suiteName
+     * @param results
+     * @param templates
+     * @return
      */
-    public void onTestFailure(TestCase test, Throwable cause) {
-        Element testCaseElement = doc.createElement("testcase");
+    private String createReportContent(String suiteName, List<TestResult> results, ReportTemplates templates) throws IOException {
+        final StringBuilder reportDetails = new StringBuilder();
 
-        testCaseElement.setAttribute("classname", test.getClass().getName());
-        testCaseElement.setAttribute("name", test.getName());
-        testCaseElement.setAttribute("time", getTestExecutionTime(test.getName()));
+        for (TestResult result: results) {
+            Properties detailProps = new Properties();
+            detailProps.put("test.class", result.getClassName());
+            detailProps.put("test.name", result.getTestName());
+            detailProps.put("test.duration", "0.0");
 
-        Element errorElement = doc.createElement("error");
-        if (cause != null) {
-            errorElement.setAttribute("message", cause.getClass().getName() + " - " + cause.getMessage());
-            errorElement.setAttribute("type", cause.getClass().getName());
-
-            StringBuffer buf = new StringBuffer();
-            buf.append(cause.getMessage());
-            buf.append("\n");
-            buf.append(cause.getClass().getName());
-            for (int i = 0; i < cause.getStackTrace().length; i++) {
-                buf.append("\n at ");
-                buf.append(cause.getStackTrace()[i]);
+            if (result.isFailed()) {
+                detailProps.put("test.error.cause", Optional.ofNullable(result.getCause()).map(Object::getClass).map(Class::getName).orElse(result.getFailureType()));
+                detailProps.put("test.error.msg", result.getErrorMessage());
+                detailProps.put("test.error.stackTrace", Optional.ofNullable(result.getCause()).map(cause -> {
+                    StringWriter writer = new StringWriter();
+                    cause.printStackTrace(new PrintWriter(writer));
+                    return writer.toString();
+                }).orElse(result.getFailureStack()));
+                reportDetails.append(PropertyUtils.replacePropertiesInString(templates.getFailedTemplate(), detailProps));
+            } else {
+                reportDetails.append(PropertyUtils.replacePropertiesInString(templates.getSuccessTemplate(), detailProps));
             }
-            errorElement.setTextContent(buf.toString());
-        } else {
-            errorElement.setAttribute("message", "No message available");
-            errorElement.setAttribute("type", "no.available");
-            errorElement.setTextContent("No exception available");
         }
 
-
-        testCaseElement.appendChild(errorElement);
-
-        testSuiteElement.appendChild(testCaseElement);
-        testResults.addResult(TestResult.failed(test.getName(), cause, test.getParameters()));
+        Properties reportProps = new Properties();
+        reportProps.put("test.suite", suiteName);
+        reportProps.put("test.cnt", Integer.toString(results.size()));
+        reportProps.put("test.skipped.cnt", Long.toString(results.stream().filter(TestResult::isSkipped).count()));
+        reportProps.put("test.failed.cnt", Long.toString(results.stream().filter(TestResult::isFailed).count()));
+        reportProps.put("test.success.cnt", Long.toString(results.stream().filter(TestResult::isSuccess).count()));
+        reportProps.put("test.error.cnt", "0");
+        reportProps.put("test.duration", "0.0");
+        reportProps.put("tests", reportDetails.toString());
+        return PropertyUtils.replacePropertiesInString(templates.getReportTemplate(), reportProps);
     }
 
     /**
-     * @see com.consol.citrus.report.TestListener#onTestFinish(com.consol.citrus.TestCase)
+     * Creates the JUnit report file
+     * @param reportFileName The report file to write
+     * @param content The String content of the report file
      */
-    public void onTestFinish(TestCase test) {
-        removeTestExecutionTime(test.getName());
+    private void createReportFile(String reportFileName, String content, File targetDirectory) {
+        if (!targetDirectory.exists()) {
+            if (!targetDirectory.mkdirs()) {
+                throw new CitrusRuntimeException("Unable to create report output directory: " + getReportDirectory() + (StringUtils.hasText(outputDirectory) ? "/" + outputDirectory : ""));
+            }
+        }
+
+        try (Writer fileWriter = new FileWriter(new File(targetDirectory, reportFileName))) {
+            fileWriter.append(content);
+            fileWriter.flush();
+        } catch (IOException e) {
+            log.error("Failed to create test report", e);
+        }
     }
 
-    /**
-     * @see com.consol.citrus.report.TestListener#onTestSkipped(com.consol.citrus.TestCase)
-     */
-    public void onTestSkipped(TestCase test) {
-        testResults.addResult(TestResult.skipped(test.getName(), test.getParameters()));
-    }
+    private class ReportTemplates {
 
-    /**
-     * @see com.consol.citrus.report.TestListener#onTestStart(com.consol.citrus.TestCase)
-     */
-    public void onTestStart(TestCase test) {
-        startTestExecution(test.getName());
-    }
+        private String reportTemplateContent;
+        private String successTemplateContent;
+        private String failedTemplateContent;
 
-    /**
-     * @see com.consol.citrus.report.TestListener#onTestSuccess(com.consol.citrus.TestCase)
-     */
-    public void onTestSuccess(TestCase test) {
-        Element testCaseElement = doc.createElement("testcase");
+        /**
+         * Gets the reportTemplateContent.
+         *
+         * @return
+         */
+        public String getReportTemplate() throws IOException {
+            if (reportTemplateContent == null) {
+                reportTemplateContent = FileUtils.readToString(FileUtils.getFileResource(reportTemplate));
+            }
 
-        testCaseElement.setAttribute("classname", test.getClass().getName());
-        testCaseElement.setAttribute("name", test.getName());
-        testCaseElement.setAttribute("time", getTestExecutionTime(test.getName()));
+            return reportTemplateContent;
+        }
 
-        testSuiteElement.appendChild(testCaseElement);
-        
-        testResults.addResult(TestResult.success(test.getName(), test.getParameters()));
-    }
+        /**
+         * Gets the successTemplateContent.
+         *
+         * @return
+         */
+        public String getSuccessTemplate() throws IOException {
+            if (successTemplateContent == null) {
+                successTemplateContent = FileUtils.readToString(FileUtils.getFileResource(successTemplate));
+            }
 
-    /**
-     * @see com.consol.citrus.report.TestSuiteListener#onFinish()
-     */
-    public void onFinish() {
-        testSuiteElement.setAttribute("errors", "" + testResults.getFailed());
-        testSuiteElement.setAttribute("failures", "0");
-        testSuiteElement.setAttribute("tests", "" + (testResults.getSuccess() + testResults.getFailed()));
-        testSuiteElement.setAttribute("time", getExecutionTime());
-    }
+            return successTemplateContent;
+        }
 
-    /**
-     * @see com.consol.citrus.report.TestSuiteListener#onFinishFailure(java.lang.Throwable)
-     */
-    public void onFinishFailure(Throwable cause) {
-    }
+        /**
+         * Gets the failedTemplateContent.
+         *
+         * @return
+         */
+        public String getFailedTemplate() throws IOException {
+            if (failedTemplateContent == null) {
+                failedTemplateContent = FileUtils.readToString(FileUtils.getFileResource(failedTemplate));
+            }
 
-    /**
-     * @see com.consol.citrus.report.TestSuiteListener#onFinishSuccess()
-     */
-    public void onFinishSuccess() {
-    }
-
-    /**
-     * @see com.consol.citrus.report.TestSuiteListener#onStart()
-     */
-    public void onStart() {
-        startExecutionTime();
-
-        try {
-            DOMImplementationRegistry registry = DOMImplementationRegistry.newInstance();
-            DOMImplementation domImpl = (DOMImplementation) registry.getDOMImplementation("LS");
-
-            doc = domImpl.createDocument("", "testsuite", null);
-
-            testSuiteElement = doc.getDocumentElement();
-            testSuiteElement.setAttribute("errors", "0");
-            testSuiteElement.setAttribute("failures", "0");
-            testSuiteElement.setAttribute("name", "citrus.AllTests");
-            testSuiteElement.setAttribute("tests", "0");
-            testSuiteElement.setAttribute("time", "0.0");
-        } catch (RuntimeException e) {
-            log.error("Error initialising reporter", e);
-        } catch (Exception e) {
-            log.error("Error initialising reporter", e);
+            return failedTemplateContent;
         }
     }
 
     /**
-     * @see com.consol.citrus.report.TestSuiteListener#onStartFailure(java.lang.Throwable)
-     */
-    public void onStartFailure(Throwable cause) {
-    }
-
-    /**
-     * @see com.consol.citrus.report.TestSuiteListener#onStartSuccess()
-     */
-    public void onStartSuccess() {
-    }
-    
-    /**
-     * Track time for test suite execution.
-     */
-    private void startExecutionTime() {
-        overallExecutionTime = System.currentTimeMillis();
-    }
-
-    /**
-     * Get current execution time of test suite.
+     * Gets the outputDirectory.
+     *
      * @return
      */
-    private String getExecutionTime() {
-        overallExecutionTime = System.currentTimeMillis() - overallExecutionTime;
-        return decFormat.format(((double)(overallExecutionTime))/1000);
+    public String getOutputDirectory() {
+        return outputDirectory;
     }
 
     /**
-     * Track test execution time.
-     * @param testName
+     * Sets the outputDirectory.
+     *
+     * @param outputDirectory
      */
-    private void startTestExecution(String testName) {
-        testExecutionTime.put(testName, System.currentTimeMillis());
+    public void setOutputDirectory(String outputDirectory) {
+        this.outputDirectory = outputDirectory;
     }
 
     /**
-     * Get current test execution time.
-     * @param testName
+     * Gets the reportFileNamePattern.
+     *
      * @return
      */
-    private String getTestExecutionTime(String testName) {
-        return decFormat.format(((double)(System.currentTimeMillis() - testExecutionTime.get(testName)))/1000);
+    public String getReportFileNamePattern() {
+        return reportFileNamePattern;
     }
 
     /**
-     * Remove test execution time for test name.
-     * @param testName
+     * Sets the reportFileNamePattern.
+     *
+     * @param reportFileNamePattern
      */
-    private void removeTestExecutionTime(String testName) {
-        testExecutionTime.remove(testName);
+    public void setReportFileNamePattern(String reportFileNamePattern) {
+        this.reportFileNamePattern = reportFileNamePattern;
     }
 
     /**
-     * Set the target output time.
-     * @param outputFile the outputFile to set
+     * Gets the reportTemplate.
+     *
+     * @return
      */
-    public void setOutputFile(Resource outputFile) {
-        this.outputFile = outputFile;
+    public String getReportTemplate() {
+        return reportTemplate;
+    }
+
+    /**
+     * Sets the reportTemplate.
+     *
+     * @param reportTemplate
+     */
+    public void setReportTemplate(String reportTemplate) {
+        this.reportTemplate = reportTemplate;
+    }
+
+    /**
+     * Gets the suiteName.
+     *
+     * @return
+     */
+    public String getSuiteName() {
+        return suiteName;
+    }
+
+    /**
+     * Sets the suiteName.
+     *
+     * @param suiteName
+     */
+    public void setSuiteName(String suiteName) {
+        this.suiteName = suiteName;
+    }
+
+    /**
+     * Gets the successTemplate.
+     *
+     * @return
+     */
+    public String getSuccessTemplate() {
+        return successTemplate;
+    }
+
+    /**
+     * Sets the successTemplate.
+     *
+     * @param successTemplate
+     */
+    public void setSuccessTemplate(String successTemplate) {
+        this.successTemplate = successTemplate;
+    }
+
+    /**
+     * Gets the failedTemplate.
+     *
+     * @return
+     */
+    public String getFailedTemplate() {
+        return failedTemplate;
+    }
+
+    /**
+     * Sets the failedTemplate.
+     *
+     * @param failedTemplate
+     */
+    public void setFailedTemplate(String failedTemplate) {
+        this.failedTemplate = failedTemplate;
+    }
+
+    /**
+     * Gets the enabled.
+     *
+     * @return
+     */
+    public boolean isEnabled() {
+        return StringUtils.hasText(enabled) && enabled.equalsIgnoreCase(Boolean.TRUE.toString());
+    }
+
+    /**
+     * Sets the enabled.
+     *
+     * @param enabled
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = String.valueOf(enabled);
     }
 }

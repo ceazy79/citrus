@@ -74,13 +74,13 @@ public class ChannelConsumer extends AbstractSelectiveMessageConsumer {
                         "' does not support selective receive operations.");
             }
 
-            MessageSelector messageSelector = new DispatchingMessageSelector(selector, endpointConfiguration.getBeanFactory());
+            MessageSelector messageSelector = new DispatchingMessageSelector(selector, endpointConfiguration.getBeanFactory(), context);
             MessageSelectingQueueChannel queueChannel = ((MessageSelectingQueueChannel) destinationChannel);
 
             if (timeout <= 0) {
-                message = endpointConfiguration.getMessageConverter().convertInbound(queueChannel.receive(messageSelector), endpointConfiguration);
+                message = endpointConfiguration.getMessageConverter().convertInbound(queueChannel.receive(messageSelector), endpointConfiguration, context);
             } else {
-                message = endpointConfiguration.getMessageConverter().convertInbound(queueChannel.receive(messageSelector, timeout), endpointConfiguration);
+                message = endpointConfiguration.getMessageConverter().convertInbound(queueChannel.receive(messageSelector, timeout), endpointConfiguration, context);
             }
         } else {
             if (!(destinationChannel instanceof PollableChannel)) {
@@ -90,7 +90,7 @@ public class ChannelConsumer extends AbstractSelectiveMessageConsumer {
 
             endpointConfiguration.getMessagingTemplate().setReceiveTimeout(timeout);
             message = endpointConfiguration.getMessageConverter().convertInbound(
-                    endpointConfiguration.getMessagingTemplate().receive((PollableChannel) destinationChannel), endpointConfiguration);
+                    endpointConfiguration.getMessagingTemplate().receive((PollableChannel) destinationChannel), endpointConfiguration, context);
         }
 
         if (message == null) {

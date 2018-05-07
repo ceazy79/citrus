@@ -24,7 +24,6 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.lang.reflect.Field;
-import java.util.*;
 
 public class CitrusArchiveBuilderTest {
 
@@ -32,11 +31,11 @@ public class CitrusArchiveBuilderTest {
     public void setCitrusVersion() {
         Field version = ReflectionUtils.findField(Citrus.class, "version");
         ReflectionUtils.makeAccessible(version);
-        ReflectionUtils.setField(version, Citrus.class, "2.6-SNAPSHOT");
+        ReflectionUtils.setField(version, Citrus.class, "2.7.5-SNAPSHOT");
     }
 
     @Test
-    public void testResolveAll() throws Exception {
+    public void testResolveAll() {
         File[] artifactResources = CitrusArchiveBuilder
                 .latestVersion()
                 .transitivity(false)
@@ -44,10 +43,11 @@ public class CitrusArchiveBuilderTest {
                 .build();
 
         Assert.assertNotNull(artifactResources);
-        Assert.assertEquals(artifactResources.length, 14);
+        Assert.assertEquals(artifactResources.length, 20);
 
         verifyArtifact(artifactResources, "citrus-core-.*jar");
         verifyArtifact(artifactResources, "citrus-jms-.*jar");
+        verifyArtifact(artifactResources, "citrus-jdbc-.*jar");
         verifyArtifact(artifactResources, "citrus-http-.*jar");
         verifyArtifact(artifactResources, "citrus-websocket-.*jar");
         verifyArtifact(artifactResources, "citrus-ws-.*jar");
@@ -57,13 +57,18 @@ public class CitrusArchiveBuilderTest {
         verifyArtifact(artifactResources, "citrus-mail-.*jar");
         verifyArtifact(artifactResources, "citrus-vertx-.*jar");
         verifyArtifact(artifactResources, "citrus-docker-.*jar");
+        verifyArtifact(artifactResources, "citrus-kubernetes-.*jar");
+        verifyArtifact(artifactResources, "citrus-selenium-.*jar");
+        verifyArtifact(artifactResources, "citrus-cucumber-.*jar");
+        verifyArtifact(artifactResources, "citrus-zookeeper-.*jar");
         verifyArtifact(artifactResources, "citrus-rmi-.*jar");
         verifyArtifact(artifactResources, "citrus-jmx-.*jar");
+        verifyArtifact(artifactResources, "citrus-restdocs-.*jar");
         verifyArtifact(artifactResources, "citrus-java-dsl-.*jar");
     }
 
     @Test
-    public void testResolveAllWithVersion() throws Exception {
+    public void testResolveAllWithVersion() {
         File[] artifactResources = CitrusArchiveBuilder
                 .version(Citrus.getVersion())
                 .transitivity(false)
@@ -71,15 +76,11 @@ public class CitrusArchiveBuilderTest {
                 .build();
 
         Assert.assertNotNull(artifactResources);
-        Assert.assertEquals(artifactResources.length, 14);
-
-        List<String> artifactFileNames = new ArrayList<>();
-        for (File artifactResource : artifactResources) {
-            artifactFileNames.add(artifactResource.getName());
-        }
+        Assert.assertEquals(artifactResources.length, 20);
 
         verifyArtifact(artifactResources, "citrus-core-.*jar");
         verifyArtifact(artifactResources, "citrus-jms-.*jar");
+        verifyArtifact(artifactResources, "citrus-jdbc-.*jar");
         verifyArtifact(artifactResources, "citrus-http-.*jar");
         verifyArtifact(artifactResources, "citrus-websocket-.*jar");
         verifyArtifact(artifactResources, "citrus-ws-.*jar");
@@ -89,13 +90,18 @@ public class CitrusArchiveBuilderTest {
         verifyArtifact(artifactResources, "citrus-mail-.*jar");
         verifyArtifact(artifactResources, "citrus-vertx-.*jar");
         verifyArtifact(artifactResources, "citrus-docker-.*jar");
+        verifyArtifact(artifactResources, "citrus-kubernetes-.*jar");
+        verifyArtifact(artifactResources, "citrus-selenium-.*jar");
+        verifyArtifact(artifactResources, "citrus-cucumber-.*jar");
+        verifyArtifact(artifactResources, "citrus-zookeeper-.*jar");
         verifyArtifact(artifactResources, "citrus-rmi-.*jar");
         verifyArtifact(artifactResources, "citrus-jmx-.*jar");
+        verifyArtifact(artifactResources, "citrus-restdocs-.*jar");
         verifyArtifact(artifactResources, "citrus-java-dsl-.*jar");
     }
 
     @Test
-    public void testResolveSelective() throws Exception {
+    public void testResolveSelective() {
         File[] artifactResources = CitrusArchiveBuilder
                 .latestVersion()
                 .transitivity(false)
@@ -109,7 +115,7 @@ public class CitrusArchiveBuilderTest {
     }
 
     @Test
-    public void testResolveOnline() throws Exception {
+    public void testResolveOnline() {
         File[] artifactResources = CitrusArchiveBuilder
                 .latestVersion()
                 .transitivity(false)

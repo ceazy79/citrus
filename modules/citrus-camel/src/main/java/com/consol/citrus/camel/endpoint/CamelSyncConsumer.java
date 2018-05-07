@@ -55,7 +55,7 @@ public class CamelSyncConsumer extends CamelConsumer implements ReplyProducer {
         super(name, endpointConfiguration);
         this.endpointConfiguration = endpointConfiguration;
 
-        this.correlationManager = new PollingCorrelationManager(endpointConfiguration, "Camel exchange not set up yet");
+        this.correlationManager = new PollingCorrelationManager<>(endpointConfiguration, "Camel exchange not set up yet");
     }
 
     @Override
@@ -72,7 +72,7 @@ public class CamelSyncConsumer extends CamelConsumer implements ReplyProducer {
 
         log.info("Received message from camel endpoint: '" + endpointConfiguration.getEndpointUri() + "'");
 
-        Message message = endpointConfiguration.getMessageConverter().convertInbound(exchange, endpointConfiguration);
+        Message message = endpointConfiguration.getMessageConverter().convertInbound(exchange, endpointConfiguration, context);
         context.onInboundMessage(message);
 
         String correlationKeyName = endpointConfiguration.getCorrelator().getCorrelationKeyName(getName());

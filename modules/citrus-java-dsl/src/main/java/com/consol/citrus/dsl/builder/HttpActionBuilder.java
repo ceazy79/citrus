@@ -25,7 +25,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.util.Assert;
 
 /**
- * Action executes docker commands.
+ * Action executes http client and server operations.
  * 
  * @author Christoph Deppisch
  * @since 2.4
@@ -55,7 +55,6 @@ public class HttpActionBuilder extends AbstractTestActionBuilder<DelegatingTestA
 	 * Initiate http client action.
 	 */
 	public HttpClientActionBuilder client(String httpClient) {
-		Assert.notNull(applicationContext, "Citrus application context is not initialized!");
 		HttpClientActionBuilder clientAction = new HttpClientActionBuilder(action, httpClient)
 				.withApplicationContext(applicationContext);
 		return clientAction;

@@ -16,11 +16,14 @@
 
 package com.consol.citrus.http.message;
 
+import com.consol.citrus.context.TestContext;
+import com.consol.citrus.exceptions.CitrusRuntimeException;
 import com.consol.citrus.http.client.HttpEndpointConfiguration;
 import com.consol.citrus.message.*;
 import org.springframework.http.*;
 import org.springframework.util.StringUtils;
 
+import javax.servlet.http.Cookie;
 import java.util.*;
 
 /**
@@ -30,10 +33,10 @@ import java.util.*;
  * @author Christoph Deppisch
  * @since 2.0
  */
-public class HttpMessageConverter implements MessageConverter<HttpEntity, HttpEndpointConfiguration> {
+public class HttpMessageConverter implements MessageConverter<HttpEntity<?>, HttpEndpointConfiguration> {
 
     @Override
-    public HttpEntity convertOutbound(Message message, HttpEndpointConfiguration endpointConfiguration) {
+    public HttpEntity<?> convertOutbound(Message message, HttpEndpointConfiguration endpointConfiguration, TestContext context) {
         HttpMessage httpMessage;
         if (message instanceof HttpMessage) {
             httpMessage = (HttpMessage) message;
@@ -54,13 +57,17 @@ public class HttpMessageConverter implements MessageConverter<HttpEntity, HttpEn
         }
 
         if (httpHeaders.getContentType() == null) {
-            httpHeaders.setContentType(MediaType.parseMediaType(endpointConfiguration.getContentType().contains("charset") ?
+            httpHeaders.setContentType(MediaType.parseMediaType((endpointConfiguration.getContentType().contains("charset") || !StringUtils.hasText(endpointConfiguration.getCharset())) ?
                     endpointConfiguration.getContentType() : endpointConfiguration.getContentType() + ";charset=" + endpointConfiguration.getCharset()));
         }
 
         Object payload = httpMessage.getPayload();
         if (httpMessage.getStatusCode() != null) {
-            return new ResponseEntity(payload, httpHeaders, httpMessage.getStatusCode());
+            return new ResponseEntity<>(payload, httpHeaders, httpMessage.getStatusCode());
+        } else {
+            for (Cookie cookie : httpMessage.getCookies()) {
+                httpHeaders.set("Cookie", cookie.getName() + "=" + context.replaceDynamicContentInString(cookie.getValue()));
+            }
         }
 
         HttpMethod method = endpointConfiguration.getRequestMethod();
@@ -69,10 +76,10 @@ public class HttpMessageConverter implements MessageConverter<HttpEntity, HttpEn
         }
 
         if (httpMethodSupportsBody(method)) {
-            return new HttpEntity(payload, httpHeaders);
+            return new HttpEntity<>(payload, httpHeaders);
+        } else {
+            return new HttpEntity<>(httpHeaders);
         }
-
-        return new HttpEntity<>(httpHeaders);
     }
 
     private boolean httpMethodSupportsBody(HttpMethod method) {
@@ -81,7 +88,7 @@ public class HttpMessageConverter implements MessageConverter<HttpEntity, HttpEn
     }
 
     @Override
-    public HttpMessage convertInbound(HttpEntity message, HttpEndpointConfiguration endpointConfiguration) {
+    public HttpMessage convertInbound(HttpEntity<?> message, HttpEndpointConfiguration endpointConfiguration, TestContext context) {
         Map<String, Object> mappedHeaders = endpointConfiguration.getHeaderMapper().toHeaders(message.getHeaders());
         HttpMessage httpMessage = new HttpMessage(message.getBody() != null ? message.getBody() : "", convertHeaderTypes(mappedHeaders));
 
@@ -89,12 +96,78 @@ public class HttpMessageConverter implements MessageConverter<HttpEntity, HttpEn
             httpMessage.setHeader(customHeader.getKey(), customHeader.getValue());
         }
 
-        if (message instanceof ResponseEntity) {
-            httpMessage.status(((ResponseEntity) message).getStatusCode());
+        if (message instanceof ResponseEntity<?>) {
+            httpMessage.status(((ResponseEntity<?>) message).getStatusCode());
             httpMessage.version("HTTP/1.1"); //TODO check if we have access to version information
+
+            if (endpointConfiguration.isHandleCookies()) {
+                List<String> cookies = message.getHeaders().get("Set-Cookie");
+                if (cookies != null) {
+                    for (String cookieString : cookies) {
+                        Cookie cookie = new Cookie(getCookieParam("Name", cookieString), getCookieParam("Value", cookieString));
+
+                        if (cookieString.contains("Comment")) {
+                            cookie.setComment(getCookieParam("Comment", cookieString));
+                        }
+
+                        if (cookieString.contains("Path")) {
+                            cookie.setPath(getCookieParam("Path", cookieString));
+                        }
+
+                        if (cookieString.contains("Domain")) {
+                            cookie.setDomain(getCookieParam("Domain", cookieString));
+                        }
+
+                        if (cookieString.contains("Max-Age")) {
+                            cookie.setMaxAge(Integer.valueOf(getCookieParam("Max-Age", cookieString)));
+                        }
+
+                        if (cookieString.contains("Secure")) {
+                            cookie.setSecure(Boolean.valueOf(getCookieParam("Secure", cookieString)));
+                        }
+
+                        if (cookieString.contains("Version")) {
+                            cookie.setVersion(Integer.valueOf(getCookieParam("Version", cookieString)));
+                        }
+
+                        httpMessage.cookie(cookie);
+                    }
+                }
+            }
         }
 
         return httpMessage;
+    }
+
+    /**
+     * Extract cookie param from cookie string as it was provided by "Set-Cookie" header.
+     * @param param
+     * @param cookieString
+     * @return
+     */
+    private String getCookieParam(String param, String cookieString) {
+        if (param.equals("Name")) {
+            return cookieString.substring(0, cookieString.indexOf("="));
+        }
+
+        if (param.equals("Value")) {
+            if (cookieString.contains(";")) {
+                return cookieString.substring(cookieString.indexOf("=") + 1, cookieString.indexOf(";"));
+            } else {
+                return cookieString.substring(cookieString.indexOf("=") + 1);
+            }
+        }
+
+        if (cookieString.contains(param + "=")) {
+            int endParam = cookieString.indexOf(";", cookieString.indexOf(param + "="));
+            if (endParam > 0) {
+                return cookieString.substring(cookieString.indexOf(param + "=") + param.length() + 1, endParam);
+            } else {
+                return cookieString.substring(cookieString.indexOf(param + "=") + param.length() + 1);
+            }
+        }
+
+        throw new CitrusRuntimeException(String.format("Unable to get cookie argument '%s' from cookie String: %s", param, cookieString));
     }
 
     /**
@@ -142,7 +215,7 @@ public class HttpMessageConverter implements MessageConverter<HttpEntity, HttpEn
     }
 
     @Override
-    public void convertOutbound(HttpEntity externalMessage, Message internalMessage, HttpEndpointConfiguration endpointConfiguration) {
-        throw new UnsupportedOperationException("HttpMessageConverter doe not support predefined HttpEntity objects");
+    public void convertOutbound(HttpEntity externalMessage, Message internalMessage, HttpEndpointConfiguration endpointConfiguration, TestContext context) {
+        throw new UnsupportedOperationException("HttpMessageConverter does not support predefined HttpEntity objects");
     }
 }

@@ -27,12 +27,12 @@ import com.consol.citrus.xml.xpath.XPathUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 
 import javax.xml.namespace.NamespaceContext;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 
 /**
@@ -65,7 +65,7 @@ public class XpathPayloadVariableExtractor implements VariableExtractor {
         NamespaceContext nsContext = context.getNamespaceContextBuilder().buildContext(message, namespaces);
 
         for (Entry<String, String> entry : xPathExpressions.entrySet()) {
-            String pathExpression = entry.getKey();
+            String pathExpression = context.replaceDynamicContentInString(entry.getKey());
             String variableName = entry.getValue();
 
             if (log.isDebugEnabled()) {
@@ -78,10 +78,14 @@ public class XpathPayloadVariableExtractor implements VariableExtractor {
                 XPathExpressionResult resultType = XPathExpressionResult.fromString(pathExpression, XPathExpressionResult.STRING);
                 pathExpression = XPathExpressionResult.cutOffPrefix(pathExpression);
                 
-                String value = XPathUtils.evaluate(doc, pathExpression, nsContext, resultType);
+                Object value = XPathUtils.evaluate(doc, pathExpression, nsContext, resultType);
 
                 if (value == null) {
                     throw new CitrusRuntimeException("Not able to find value for expression: " + pathExpression);
+                }
+
+                if (value instanceof List) {
+                    value = StringUtils.arrayToCommaDelimitedString(((List)value).toArray(new String[((List)value).size()]));
                 }
                 
                 context.setVariable(variableName, value);

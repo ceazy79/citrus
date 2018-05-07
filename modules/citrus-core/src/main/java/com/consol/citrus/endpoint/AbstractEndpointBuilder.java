@@ -20,7 +20,11 @@ import com.consol.citrus.TestActor;
 import com.consol.citrus.annotations.CitrusEndpoint;
 import com.consol.citrus.annotations.CitrusEndpointProperty;
 import com.consol.citrus.exceptions.CitrusRuntimeException;
+import com.consol.citrus.util.TypeConversionUtils;
+import org.springframework.beans.factory.BeanFactoryAware;
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
 import org.springframework.util.ReflectionUtils;
 
 import java.lang.reflect.Method;
@@ -51,79 +55,56 @@ public abstract class AbstractEndpointBuilder<T extends Endpoint> implements End
         return this;
     }
 
+    /**
+     * Initializes the endpoint.
+     * @return
+     */
+    public AbstractEndpointBuilder<T> initialize() {
+        if (getEndpoint() instanceof InitializingBean) {
+            try {
+                ((InitializingBean) getEndpoint()).afterPropertiesSet();
+            } catch (Exception e) {
+                throw new CitrusRuntimeException("Failed to initialize endpoint", e);
+            }
+        }
+
+        return this;
+    }
+
+    /**
+     * Sets the Spring application context.
+     * @param applicationContext
+     * @return
+     */
+    public AbstractEndpointBuilder<T> applicationContext(ApplicationContext applicationContext) {
+        if (getEndpoint() instanceof ApplicationContextAware) {
+            ((ApplicationContextAware) getEndpoint()).setApplicationContext(applicationContext);
+        }
+
+        if (getEndpoint() instanceof BeanFactoryAware) {
+            ((BeanFactoryAware) getEndpoint()).setBeanFactory(applicationContext);
+        }
+
+        return this;
+    }
+
     @Override
     public T build(CitrusEndpoint endpointAnnotation) {
         ReflectionUtils.invokeMethod(ReflectionUtils.findMethod(this.getClass(), "name"), this, endpointAnnotation.name());
 
         for (CitrusEndpointProperty endpointProperty : endpointAnnotation.properties()) {
-            Method propertyMethod = ReflectionUtils.findMethod(this.getClass(), "name");
+            Method propertyMethod = ReflectionUtils.findMethod(this.getClass(), endpointProperty.name());
             if (propertyMethod != null) {
-                ReflectionUtils.invokeMethod(propertyMethod, this, getTypedParameterValue(endpointProperty.type(), endpointProperty.value()));
+                ReflectionUtils.invokeMethod(propertyMethod, this, TypeConversionUtils.convertStringToType(endpointProperty.value(), endpointProperty.type()));
             }
         }
 
         return build();
     }
 
-    /**
-     * Convert parameter value string to required type from setter method argument.
-     * @param fieldType
-     * @param value
-     * @return
-     */
-    private Object getTypedParameterValue(Class<?> fieldType, String value) {
-        if (fieldType.isPrimitive()) {
-            if (fieldType.isAssignableFrom(int.class)) {
-                return Integer.valueOf(value).intValue();
-            } else if (fieldType.isAssignableFrom(short.class)) {
-                return Short.valueOf(value).shortValue();
-            }  else if (fieldType.isAssignableFrom(byte.class)) {
-                return Byte.valueOf(value).byteValue();
-            } else if (fieldType.isAssignableFrom(long.class)) {
-                return Long.valueOf(value).longValue();
-            } else if (fieldType.isAssignableFrom(boolean.class)) {
-                return Boolean.valueOf(value).booleanValue();
-            } else if (fieldType.isAssignableFrom(float.class)) {
-                return Float.valueOf(value).floatValue();
-            } else if (fieldType.isAssignableFrom(double.class)) {
-                return Double.valueOf(value).doubleValue();
-            }
-        } else {
-            if (fieldType.isAssignableFrom(String.class)) {
-                return value;
-            } else if (fieldType.isAssignableFrom(Integer.class)) {
-                return Integer.valueOf(value);
-            } else if (fieldType.isAssignableFrom(Short.class)) {
-                return Short.valueOf(value);
-            }  else if (fieldType.isAssignableFrom(Byte.class)) {
-                return Byte.valueOf(value);
-            }  else if (fieldType.isAssignableFrom(Long.class)) {
-                return Long.valueOf(value);
-            } else if (fieldType.isAssignableFrom(Boolean.class)) {
-                return Boolean.valueOf(value);
-            } else if (fieldType.isAssignableFrom(Float.class)) {
-                return Float.valueOf(value);
-            } else if (fieldType.isAssignableFrom(Double.class)) {
-                return Double.valueOf(value);
-            }
-        }
-
-        throw new CitrusRuntimeException(String.format("Unable to convert parameter '%s' to required type '%s'", value, fieldType.getName()));
-    }
-
     @Override
     public T build() {
-        T endpoint = getEndpoint();
-
-        if (endpoint instanceof InitializingBean) {
-            try {
-                ((InitializingBean) endpoint).afterPropertiesSet();
-            } catch (Exception e) {
-                throw new CitrusRuntimeException("Failed to build endpoint", e);
-            }
-        }
-
-        return endpoint;
+        return getEndpoint();
     }
 
     /**

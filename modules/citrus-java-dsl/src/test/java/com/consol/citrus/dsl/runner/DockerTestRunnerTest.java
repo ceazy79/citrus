@@ -17,13 +17,9 @@
 package com.consol.citrus.dsl.runner;
 
 import com.consol.citrus.TestCase;
-import com.consol.citrus.context.TestContext;
 import com.consol.citrus.docker.actions.DockerExecuteAction;
-import com.consol.citrus.docker.command.CommandResultCallback;
-import com.consol.citrus.dsl.builder.BuilderSupport;
-import com.consol.citrus.dsl.builder.DockerActionBuilder;
+import com.consol.citrus.docker.client.DockerClient;
 import com.consol.citrus.testng.AbstractTestNGUnitTest;
-import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.*;
 import com.github.dockerjava.api.model.Info;
 import com.github.dockerjava.api.model.Version;
@@ -33,7 +29,8 @@ import org.testng.annotations.Test;
 
 import java.util.UUID;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.when;
 
 /**
  * @author Christoph Deppisch
@@ -41,7 +38,7 @@ import static org.mockito.Mockito.*;
  */
 public class DockerTestRunnerTest extends AbstractTestNGUnitTest {
 
-    private DockerClient dockerClient = Mockito.mock(DockerClient.class);
+    private com.github.dockerjava.api.DockerClient dockerClient = Mockito.mock(com.github.dockerjava.api.DockerClient.class);
 
     @Test
     public void testDockerBuilder() {
@@ -72,62 +69,37 @@ public class DockerTestRunnerTest extends AbstractTestNGUnitTest {
         when(dockerClient.inspectContainerCmd("my_container")).thenReturn(inspectCmd);
         when(inspectCmd.exec()).thenReturn(new InspectContainerResponse());
 
+        final DockerClient client = new com.consol.citrus.docker.client.DockerClient();
+        client.getEndpointConfiguration().setDockerClient(dockerClient);
+
         MockTestRunner builder = new MockTestRunner(getClass().getSimpleName(), applicationContext, context) {
             @Override
             public void execute() {
-                docker(new BuilderSupport<DockerActionBuilder>() {
-                    @Override
-                    public void configure(DockerActionBuilder builder) {
-                        builder.client(new com.consol.citrus.docker.client.DockerClient(dockerClient))
-                            .info();
-                    }
-                });
+                docker(builder -> builder.client(client)
+                    .info());
 
-                docker(new BuilderSupport<DockerActionBuilder>() {
-                    @Override
-                    public void configure(DockerActionBuilder builder) {
-                        builder.client(new com.consol.citrus.docker.client.DockerClient(dockerClient))
-                            .ping();
-                    }
-                });
+                docker(builder -> builder.client(client)
+                    .ping());
 
-                docker(new BuilderSupport<DockerActionBuilder>() {
-                    @Override
-                    public void configure(DockerActionBuilder builder) {
-                        builder.client(new com.consol.citrus.docker.client.DockerClient(dockerClient))
-                            .version()
-                            .validateCommandResult(new CommandResultCallback<Version>() {
-                                @Override
-                                public void doWithCommandResult(Version result, TestContext context) {
-                                    Assert.assertNotNull(result);
-                                }
-                            });
-                    }
-                });
+                docker(builder -> builder.client(client)
+                    .version()
+                    .validateCommandResult((result, context) -> {
+                        Assert.assertNotNull(result);
+                    }));
 
-                docker(new BuilderSupport<DockerActionBuilder>() {
-                    @Override
-                    public void configure(DockerActionBuilder builder) {
-                        builder.client(new com.consol.citrus.docker.client.DockerClient(dockerClient))
-                            .create("new_image")
-                                .name("my_container");
-                    }
-                });
+                docker(builder -> builder.client(client)
+                    .create("new_image")
+                        .name("my_container"));
 
-                docker(new BuilderSupport<DockerActionBuilder>() {
-                    @Override
-                    public void configure(DockerActionBuilder builder) {
-                        builder.client(new com.consol.citrus.docker.client.DockerClient(dockerClient))
-                            .inspectContainer("my_container");
-                    }
-                });
+                docker(builder -> builder.client(client)
+                    .inspectContainer("my_container"));
             }
         };
 
         TestCase test = builder.getTestCase();
         Assert.assertEquals(test.getActionCount(), 5);
         Assert.assertEquals(test.getActions().get(0).getClass(), DockerExecuteAction.class);
-        Assert.assertEquals(test.getLastExecutedAction().getClass(), DockerExecuteAction.class);
+        Assert.assertEquals(test.getActiveAction().getClass(), DockerExecuteAction.class);
 
         DockerExecuteAction action = (DockerExecuteAction)test.getActions().get(0);
         Assert.assertEquals(action.getName(), "docker-execute");

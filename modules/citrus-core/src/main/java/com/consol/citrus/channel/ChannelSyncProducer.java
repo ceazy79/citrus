@@ -53,7 +53,7 @@ public class ChannelSyncProducer extends ChannelProducer implements ReplyConsume
         super(name, endpointConfiguration);
         this.endpointConfiguration = endpointConfiguration;
 
-        this.correlationManager = new PollingCorrelationManager(endpointConfiguration, "Reply message did not arrive yet");
+        this.correlationManager = new PollingCorrelationManager<>(endpointConfiguration, "Reply message did not arrive yet");
     }
 
     @Override
@@ -66,7 +66,7 @@ public class ChannelSyncProducer extends ChannelProducer implements ReplyConsume
 
         if (log.isDebugEnabled()) {
             log.debug("Sending message to channel: '" + destinationChannelName + "'");
-            log.debug("Message to sent is:\n" + message.toString());
+            log.debug("Message to send is:\n" + message.toString());
         }
 
         endpointConfiguration.getMessagingTemplate().setReceiveTimeout(endpointConfiguration.getTimeout());
@@ -74,7 +74,7 @@ public class ChannelSyncProducer extends ChannelProducer implements ReplyConsume
         log.info("Message was sent to channel: '" + destinationChannelName + "'");
 
         org.springframework.messaging.Message replyMessage = endpointConfiguration.getMessagingTemplate().sendAndReceive(getDestinationChannel(),
-                endpointConfiguration.getMessageConverter().convertOutbound(message, endpointConfiguration));
+                endpointConfiguration.getMessageConverter().convertOutbound(message, endpointConfiguration, context));
 
         if (replyMessage == null) {
             throw new ActionTimeoutException("Reply timed out after " +
@@ -83,7 +83,7 @@ public class ChannelSyncProducer extends ChannelProducer implements ReplyConsume
             log.info("Received synchronous response from reply channel");
         }
 
-        correlationManager.store(correlationKey, endpointConfiguration.getMessageConverter().convertInbound(replyMessage, endpointConfiguration));
+        correlationManager.store(correlationKey, endpointConfiguration.getMessageConverter().convertInbound(replyMessage, endpointConfiguration, context));
     }
 
     @Override

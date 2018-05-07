@@ -56,7 +56,7 @@ public class VertxSyncProducer extends VertxProducer implements ReplyConsumer {
         this.vertx = vertx;
         this.endpointConfiguration = endpointConfiguration;
 
-        this.correlationManager = new PollingCorrelationManager(endpointConfiguration, "Reply message did not arrive yet");
+        this.correlationManager = new PollingCorrelationManager<>(endpointConfiguration, "Reply message did not arrive yet");
     }
 
     @Override
@@ -78,7 +78,7 @@ public class VertxSyncProducer extends VertxProducer implements ReplyConsumer {
                 public void handle(AsyncResult<io.vertx.core.eventbus.Message<Object>> event) {
                     log.info("Received synchronous response on Vert.x event bus reply address");
 
-                    Message responseMessage = endpointConfiguration.getMessageConverter().convertInbound(event.result(), endpointConfiguration);
+                    Message responseMessage = endpointConfiguration.getMessageConverter().convertInbound(event.result(), endpointConfiguration, context);
 
                     context.onInboundMessage(responseMessage);
                     correlationManager.store(correlationKey, responseMessage);

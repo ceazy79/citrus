@@ -19,6 +19,7 @@ package com.consol.citrus.ws.config.xml;
 import com.consol.citrus.config.TestActionRegistry;
 import com.consol.citrus.config.util.BeanDefinitionParserUtils;
 import com.consol.citrus.config.xml.DescriptionElementParser;
+import com.consol.citrus.util.FileUtils;
 import com.consol.citrus.validation.xml.XmlMessageValidationContext;
 import com.consol.citrus.ws.actions.AssertSoapFault;
 import com.consol.citrus.ws.validation.SoapFaultDetailValidationContext;
@@ -28,7 +29,6 @@ import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.support.BeanDefinitionBuilder;
 import org.springframework.beans.factory.xml.BeanDefinitionParser;
 import org.springframework.beans.factory.xml.ParserContext;
-import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.util.xml.DomUtils;
 import org.w3c.dom.Element;
@@ -63,9 +63,10 @@ public class AssertSoapFaultParser implements BeanDefinitionParser {
                     throw new BeanCreationException("You tried to set fault-detail by file resource attribute and inline text value at the same time! " +
                             "Please choose one of them.");
                 }
-                
+
+                String charset = faultDetailElement.getAttribute("charset");
                 String filePath = faultDetailElement.getAttribute("file");
-                soapFaultDetailPaths.add(filePath);
+                soapFaultDetailPaths.add(filePath + (StringUtils.hasText(charset) ? FileUtils.FILE_PATH_CHARSET_PARAMETER + charset : ""));
             } else {
                 String faultDetailData = DomUtils.getTextValue(faultDetailElement).trim();
                 if (StringUtils.hasText(faultDetailData)) {
@@ -100,17 +101,7 @@ public class AssertSoapFaultParser implements BeanDefinitionParser {
         }
         
         Map<String, BeanDefinitionParser> actionRegistry = TestActionRegistry.getRegisteredActionParser();
-        Element action;
-        if (CollectionUtils.isEmpty(faultDetails)) {
-            action = DOMUtil.getFirstChildElement(element);
-        } else {
-            action = DOMUtil.getLastChildElement(element);
-        }
-        
-        if (action != null && action.getTagName().equals("description")) {
-            action = DOMUtil.getNextSiblingElement(action);
-        }
-
+        Element action = DOMUtil.getFirstChildElement(DomUtils.getChildElementByTagName(element, "when"));
         if (action != null) {
             BeanDefinitionParser parser = actionRegistry.get(action.getTagName());
             

@@ -20,8 +20,10 @@ import com.consol.citrus.endpoint.EndpointAdapter;
 import com.consol.citrus.http.client.HttpEndpointConfiguration;
 import com.consol.citrus.http.controller.HttpMessageController;
 import com.consol.citrus.http.interceptor.*;
+import com.consol.citrus.http.message.DelegatingHttpEntityMessageConverter;
 import com.consol.citrus.http.server.HttpServer;
 import org.springframework.context.ApplicationContext;
+import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.integration.http.support.DefaultHttpHeaderMapper;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.context.request.WebRequestInterceptor;
@@ -50,6 +52,7 @@ public class CitrusDispatcherServlet extends DispatcherServlet {
     protected static final String LOGGING_INTERCEPTOR_BEAN_NAME = "citrusLoggingInterceptor";
     protected static final String HANDLER_INTERCEPTOR_BEAN_NAME = "citrusHandlerInterceptor";
     protected static final String MESSAGE_CONTROLLER_BEAN_NAME = "citrusHttpMessageController";
+    protected static final String MESSAGE_CONVERTER_BEAN_NAME = "citrusHttpMessageConverter";
 
     /**
      * Default constructor using http server instance that
@@ -66,6 +69,7 @@ public class CitrusDispatcherServlet extends DispatcherServlet {
 
         configureHandlerInterceptor(context);
         configureMessageController(context);
+        configureMessageConverter(context);
     }
 
     /**
@@ -91,10 +95,27 @@ public class CitrusDispatcherServlet extends DispatcherServlet {
             HttpEndpointConfiguration endpointConfiguration = new HttpEndpointConfiguration();
             endpointConfiguration.setMessageConverter(httpServer.getMessageConverter());
             endpointConfiguration.setHeaderMapper(DefaultHttpHeaderMapper.inboundMapper());
+            endpointConfiguration.setHandleAttributeHeaders(httpServer.isHandleAttributeHeaders());
+            endpointConfiguration.setHandleCookies(httpServer.isHandleCookies());
+            endpointConfiguration.setDefaultStatusCode(httpServer.getDefaultStatusCode());
             messageController.setEndpointConfiguration(endpointConfiguration);
 
             if (endpointAdapter != null) {
                 messageController.setEndpointAdapter(endpointAdapter);
+            }
+        }
+    }
+
+    /**
+     * Post process message converter.
+     * @param context
+     */
+    protected void configureMessageConverter(ApplicationContext context) {
+        if (context.containsBean(MESSAGE_CONVERTER_BEAN_NAME)) {
+            HttpMessageConverter messageConverter = context.getBean(MESSAGE_CONVERTER_BEAN_NAME, HttpMessageConverter.class);
+
+            if (messageConverter instanceof DelegatingHttpEntityMessageConverter) {
+                ((DelegatingHttpEntityMessageConverter) messageConverter).setBinaryMediaTypes(httpServer.getBinaryMediaTypes());
             }
         }
     }

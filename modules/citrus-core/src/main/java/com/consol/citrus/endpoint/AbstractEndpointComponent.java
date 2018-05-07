@@ -18,6 +18,7 @@ package com.consol.citrus.endpoint;
 
 import com.consol.citrus.context.TestContext;
 import com.consol.citrus.exceptions.CitrusRuntimeException;
+import com.consol.citrus.util.TypeConversionUtils;
 import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
 
@@ -87,11 +88,13 @@ public abstract class AbstractEndpointComponent implements EndpointComponent {
             StringTokenizer tok = new StringTokenizer(parameterString, "&");
             while (tok.hasMoreElements()) {
                 String[] parameterValue = tok.nextToken().split("=");
-                if (parameterValue.length != 2) {
+                if (parameterValue.length == 1) {
+                    parameters.put(parameterValue[0], null);
+                } else if (parameterValue.length == 2) {
+                    parameters.put(parameterValue[0], parameterValue[1]);
+                } else {
                     throw new CitrusRuntimeException(String.format("Invalid parameter key/value combination '%s'", parameterValue));
                 }
-
-                parameters.put(parameterValue[0], parameterValue[1]);
             }
         }
 
@@ -119,7 +122,11 @@ public abstract class AbstractEndpointComponent implements EndpointComponent {
                         "set" + parameterEntry.getKey().substring(0, 1).toUpperCase() + parameterEntry.getKey().substring(1)));
             }
 
-            ReflectionUtils.invokeMethod(setter, endpointConfiguration, getTypedParameterValue(field.getType(), parameterEntry.getValue(), context));
+            if (parameterEntry.getValue() != null) {
+                ReflectionUtils.invokeMethod(setter, endpointConfiguration, TypeConversionUtils.convertStringToType(parameterEntry.getValue(), field.getType(), context));
+            } else {
+                ReflectionUtils.invokeMethod(setter, endpointConfiguration, field.getType().cast(null));
+            }
         }
     }
 
@@ -165,69 +172,20 @@ public abstract class AbstractEndpointComponent implements EndpointComponent {
 
             if (field == null) {
                 if (paramString.length() == 0) {
-                    paramString.append("?").append(parameterEntry.getKey()).append("=").append(parameterEntry.getValue());
+                    paramString.append("?").append(parameterEntry.getKey());
+                    if (parameterEntry.getValue() != null) {
+                        paramString.append("=").append(parameterEntry.getValue());
+                    }
                 } else {
-                    paramString.append("&").append(parameterEntry.getKey()).append("=").append(parameterEntry.getValue());
+                    paramString.append("&").append(parameterEntry.getKey());
+                    if (parameterEntry.getValue() != null) {
+                        paramString.append("=").append(parameterEntry.getValue());
+                    }
                 }
             }
         }
 
         return paramString.toString();
-    }
-
-    /**
-     * Convert parameter value string to required type from setter method argument.
-     * @param fieldType
-     * @param value
-     * @param context
-     * @return
-     */
-    private Object getTypedParameterValue(Class<?> fieldType, String value, TestContext context) {
-        if (fieldType.isPrimitive()) {
-            if (fieldType.isAssignableFrom(int.class)) {
-                return Integer.valueOf(value).intValue();
-            } else if (fieldType.isAssignableFrom(short.class)) {
-                return Short.valueOf(value).shortValue();
-            }  else if (fieldType.isAssignableFrom(byte.class)) {
-                return Byte.valueOf(value).byteValue();
-            } else if (fieldType.isAssignableFrom(long.class)) {
-                return Long.valueOf(value).longValue();
-            } else if (fieldType.isAssignableFrom(boolean.class)) {
-                return Boolean.valueOf(value).booleanValue();
-            } else if (fieldType.isAssignableFrom(float.class)) {
-                return Float.valueOf(value).floatValue();
-            } else if (fieldType.isAssignableFrom(double.class)) {
-                return Double.valueOf(value).doubleValue();
-            }
-        } else {
-            if (fieldType.isAssignableFrom(String.class)) {
-                return value;
-            } else if (fieldType.isAssignableFrom(Integer.class)) {
-                return Integer.valueOf(value);
-            } else if (fieldType.isAssignableFrom(Short.class)) {
-                return Short.valueOf(value);
-            }  else if (fieldType.isAssignableFrom(Byte.class)) {
-                return Byte.valueOf(value);
-            }  else if (fieldType.isAssignableFrom(Long.class)) {
-                return Long.valueOf(value);
-            } else if (fieldType.isAssignableFrom(Boolean.class)) {
-                return Boolean.valueOf(value);
-            } else if (fieldType.isAssignableFrom(Float.class)) {
-                return Float.valueOf(value);
-            } else if (fieldType.isAssignableFrom(Double.class)) {
-                return Double.valueOf(value);
-            }
-
-            // try to resolve bean in application context
-            if (context.getApplicationContext() != null && context.getApplicationContext().containsBean(value)) {
-                Object bean = context.getApplicationContext().getBean(value);
-                if (fieldType.isAssignableFrom(bean.getClass())) {
-                    return bean;
-                }
-            }
-        }
-
-        throw new CitrusRuntimeException(String.format("Unable to convert parameter '%s' to required type '%s'", value, fieldType.getName()));
     }
 
     /**

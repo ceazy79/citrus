@@ -17,6 +17,8 @@
 package com.consol.citrus.xml.xpath;
 
 import com.consol.citrus.exceptions.CitrusRuntimeException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -37,9 +39,9 @@ import java.util.Map.Entry;
  */
 public abstract class XPathUtils {
 
-    /** XPath expression factory */
-    private static XPathFactory xPathFactory;
-    
+    /** Logger */
+    private static Logger log = LoggerFactory.getLogger(XPathUtils.class);
+
     /** Dynamic namespace prefix suffix */
     public static final String DYNAMIC_NS_START = "{";
     public static final String DYNAMIC_NS_END = "}";
@@ -47,10 +49,6 @@ public abstract class XPathUtils {
     /** Dynamic namespace prefix */
     private static final String DYNAMIC_NS_PREFIX = "dns";
 
-    static {
-        xPathFactory = XPathFactory.newInstance();
-    }
-    
     /**
      * Prevent instantiation.
      */
@@ -123,7 +121,7 @@ public abstract class XPathUtils {
      * @param resultType
      * @return
      */
-    public static String evaluate(Node node, String xPathExpression,
+    public static Object evaluate(Node node, String xPathExpression,
             NamespaceContext nsContext, XPathExpressionResult resultType) {
         if (resultType.equals(XPathExpressionResult.NODE)) {
             Node resultNode = evaluateAsNode(node, xPathExpression, nsContext);
@@ -140,7 +138,7 @@ public abstract class XPathUtils {
         } else if (resultType.equals(XPathExpressionResult.NODESET)) {
             NodeList resultNodeList = evaluateAsNodeList(node, xPathExpression, nsContext);
 
-            ArrayList<String> values = new ArrayList<>();
+            List<String> values = new ArrayList<>();
             for (int i = 0; i < resultNodeList.getLength(); i++) {
                 Node resultNode = resultNodeList.item(i);
 
@@ -155,17 +153,21 @@ public abstract class XPathUtils {
                 }
             }
 
-            return StringUtils.arrayToCommaDelimitedString(values.toArray(new String[values.size()]));
-        } else if (resultType.equals(XPathExpressionResult.STRING)){
+            return values;
+        } else if (resultType.equals(XPathExpressionResult.STRING)) {
             return evaluateAsString(node, xPathExpression, nsContext);
         } else {
             Object result = evaluateAsObject(node, xPathExpression, nsContext, resultType.getAsQName());
 
             if (result == null) {
                 throw new CitrusRuntimeException("No result for XPath expression: '" + xPathExpression + "'");
-            } else {
-                return result.toString();
             }
+
+            if (resultType.equals(XPathExpressionResult.INTEGER)) {
+                return (int) Math.round((Double) result);
+            }
+
+            return result;
         }
     }
 
@@ -266,7 +268,7 @@ public abstract class XPathUtils {
      */
     private static XPathExpression buildExpression(String xPathExpression, NamespaceContext nsContext)
             throws XPathExpressionException {
-        XPath xpath = xPathFactory.newXPath();
+        XPath xpath = createXPathFactory().newXPath();
         
         if (nsContext != null) {
             xpath.setNamespaceContext(nsContext);
@@ -297,8 +299,41 @@ public abstract class XPathUtils {
         try {
             return buildExpression(xPathExpression, nsContext).evaluate(node, returnType);
         } catch (XPathExpressionException e) {
-            throw new CitrusRuntimeException("Can not evaluate xpath expression '"+xPathExpression+"'", e);
+            throw new CitrusRuntimeException("Can not evaluate xpath expression '" + xPathExpression + "'", e);
         }
+    }
+
+    /**
+     * Creates new xpath factory which is not thread safe per definition.
+     * @return
+     */
+    private synchronized static XPathFactory createXPathFactory() {
+        XPathFactory factory = null;
+
+        // read system property and see if there is a factory set
+        Properties properties = System.getProperties();
+        for (Map.Entry<Object, Object> prop : properties.entrySet()) {
+            String key = (String) prop.getKey();
+            if (key.startsWith(XPathFactory.DEFAULT_PROPERTY_NAME)) {
+                String uri = key.indexOf(":") > 0 ? key.substring(key.indexOf(":") + 1) : null;
+                if (uri != null) {
+                    try {
+                        factory = XPathFactory.newInstance(uri);
+                    } catch (XPathFactoryConfigurationException e) {
+                        log.warn("Failed to instantiate xpath factory", e);
+                        factory = XPathFactory.newInstance();
+                    }
+                    log.info("Created xpath factory {} using system property {} with value {}", factory, key, uri);
+                }
+            }
+        }
+
+        if (factory == null) {
+            factory = XPathFactory.newInstance();
+            log.info("Created default xpath factory {}", factory);
+        }
+
+        return factory;
     }
 
 }

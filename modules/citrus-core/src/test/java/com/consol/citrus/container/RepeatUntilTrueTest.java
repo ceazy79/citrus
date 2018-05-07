@@ -21,10 +21,12 @@ import com.consol.citrus.context.TestContext;
 import com.consol.citrus.testng.AbstractTestNGUnitTest;
 import org.mockito.Mockito;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.util.Collections;
 
+import static org.hamcrest.Matchers.is;
 import static org.mockito.Mockito.*;
 
 
@@ -35,15 +37,15 @@ public class RepeatUntilTrueTest extends AbstractTestNGUnitTest {
 
     private TestAction action = Mockito.mock(TestAction.class);
 
-    @Test
-    public void testRepeat() {
+    @Test(dataProvider = "expressionProvider")
+    public void testRepeat(String expression) {
         RepeatUntilTrue repeatUntilTrue = new RepeatUntilTrue();
 
         reset(action);
 
         repeatUntilTrue.setActions(Collections.singletonList(action));
 
-        repeatUntilTrue.setCondition("i = 5");
+        repeatUntilTrue.setCondition(expression);
         repeatUntilTrue.setIndexName("i");
 
         repeatUntilTrue.execute(context);
@@ -52,6 +54,15 @@ public class RepeatUntilTrueTest extends AbstractTestNGUnitTest {
         Assert.assertEquals(context.getVariable("${i}"), "4");
 
         verify(action, times(4)).execute(context);
+    }
+
+    @DataProvider
+    public Object[][] expressionProvider() {
+        return new Object[][] {
+                new Object[] {"i = 5"},
+                new Object[] {"@assertThat(is(5))@"},
+                new Object[] {"@assertThat('${i}', 'is(5)')@"}
+        };
     }
     
     @Test
@@ -87,6 +98,24 @@ public class RepeatUntilTrueTest extends AbstractTestNGUnitTest {
                 return index == 5;
             }
         });
+
+        repeatUntilTrue.execute(context);
+
+        Assert.assertNotNull(context.getVariable("${i}"));
+        Assert.assertEquals(context.getVariable("${i}"), "4");
+
+        verify(action, times(4)).execute(context);
+    }
+
+    @Test
+    public void testRepeatHamcrestConditionExpression() {
+        RepeatUntilTrue repeatUntilTrue = new RepeatUntilTrue();
+
+        reset(action);
+
+        repeatUntilTrue.setActions(Collections.singletonList(action));
+
+        repeatUntilTrue.setConditionExpression(new HamcrestConditionExpression(is(5)));
 
         repeatUntilTrue.execute(context);
 

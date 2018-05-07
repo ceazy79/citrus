@@ -29,7 +29,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.BeanFactoryAware;
-import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.util.*;
@@ -52,10 +51,10 @@ public class PurgeEndpointAction extends AbstractTestAction implements BeanFacto
     private BeanFactory beanFactory;
 
     /** Build message selector with name value pairs */
-    private Map<String, Object> messageSelector = new HashMap<>();
+    private Map<String, Object> messageSelectorMap = new HashMap<>();
 
     /** Select messages via message selector string */
-    private String messageSelectorString;
+    private String messageSelector;
 
     /** Time to wait until timeout in ms */
     private long receiveTimeout = 100;
@@ -106,8 +105,8 @@ public class PurgeEndpointAction extends AbstractTestAction implements BeanFacto
         Consumer messageConsumer = endpoint.createConsumer();
         Message message;
         do {
-            String selector = buildMessageSelector(context);
             try {
+                String selector = MessageSelectorBuilder.build(messageSelector, messageSelectorMap, context);
                 if (StringUtils.hasText(selector) && messageConsumer instanceof SelectiveConsumer) {
                     message = (receiveTimeout >= 0) ? ((SelectiveConsumer) messageConsumer).receive(selector, context, receiveTimeout) : ((SelectiveConsumer) messageConsumer).receive(selector, context);
                 } else {
@@ -138,22 +137,6 @@ public class PurgeEndpointAction extends AbstractTestAction implements BeanFacto
     }
 
     /**
-     * Build message selector string from either message key value pairs or selector string.
-     * @return
-     */
-    private String buildMessageSelector(TestContext context) {
-        //build message selector string if present
-        if (StringUtils.hasText(messageSelectorString)) {
-            return context.replaceDynamicContentInString(messageSelectorString);
-        } else if (!CollectionUtils.isEmpty(messageSelector)) {
-            return MessageSelectorBuilder.fromKeyValueMap(
-                    context.resolveDynamicValuesInMap(messageSelector)).build();
-        }
-
-        return "";
-    }
-
-    /**
      * Resolve the endpoint by name.
      * @param endpointName the name to resolve
      * @return the Endpoint object
@@ -166,10 +149,7 @@ public class PurgeEndpointAction extends AbstractTestAction implements BeanFacto
         }
     }
 
-    /**
-     * Sets the bean factory for endpoint name resolving.
-     * @see org.springframework.beans.factory.BeanFactoryAware#setBeanFactory(org.springframework.beans.factory.BeanFactory)
-     */
+    @Override
     public void setBeanFactory(BeanFactory beanFactory) throws BeansException {
         this.beanFactory = beanFactory;
     }
@@ -218,36 +198,36 @@ public class PurgeEndpointAction extends AbstractTestAction implements BeanFacto
 
     /**
      * Setter for messageSelector.
-     * @param messageSelector
+     * @param messageSelectorMap
      */
-    public PurgeEndpointAction setMessageSelector(Map<String, Object> messageSelector) {
-        this.messageSelector = messageSelector;
+    public PurgeEndpointAction setMessageSelectorMap(Map<String, Object> messageSelectorMap) {
+        this.messageSelectorMap = messageSelectorMap;
         return this;
     }
 
     /**
      * Set message selector string.
-     * @param messageSelectorString
+     * @param messageSelector
      */
-    public PurgeEndpointAction setMessageSelectorString(String messageSelectorString) {
-        this.messageSelectorString = messageSelectorString;
+    public PurgeEndpointAction setMessageSelector(String messageSelector) {
+        this.messageSelector = messageSelector;
         return this;
+    }
+
+    /**
+     * Gets the messageSelector as map.
+     * @return the messageSelectorMap
+     */
+    public Map<String, Object> getMessageSelectorMap() {
+        return messageSelectorMap;
     }
 
     /**
      * Gets the messageSelector.
      * @return the messageSelector
      */
-    public Map<String, Object> getMessageSelector() {
+    public String getMessageSelector() {
         return messageSelector;
-    }
-
-    /**
-     * Gets the messageSelectorString.
-     * @return the messageSelectorString
-     */
-    public String getMessageSelectorString() {
-        return messageSelectorString;
     }
 
     /**

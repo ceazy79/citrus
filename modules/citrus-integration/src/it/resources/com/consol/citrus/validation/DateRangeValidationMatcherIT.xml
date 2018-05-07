@@ -1,20 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  ~ Copyright 2006-2015 the original author or authors.
-  ~
-  ~ Licensed under the Apache License, Version 2.0 (the "License");
-  ~ you may not use this file except in compliance with the License.
-  ~ You may obtain a copy of the License at
-  ~
-  ~    http://www.apache.org/licenses/LICENSE-2.0
-  ~
-  ~ Unless required by applicable law or agreed to in writing, software
-  ~ distributed under the License is distributed on an "AS IS" BASIS,
-  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  ~ See the License for the specific language governing permissions and
-  ~ limitations under the License.
-  -->
-
 <spring:beans xmlns="http://www.citrusframework.org/schema/testcase"
               xmlns:spring="http://www.springframework.org/schema/beans"
               xmlns:http="http://www.citrusframework.org/schema/http/testcase"
@@ -46,7 +30,7 @@
       <parallel>
         <http:send-request client="httpClient">
           <http:POST>
-            <http:headers content-type="text/xml" accept="text/xml, */*"/>
+            <http:headers content-type="application/xml" accept="application/xml"/>
             <http:body>
               <http:data>
                 <![CDATA[
@@ -62,7 +46,7 @@
         <sequential>
           <http:receive-request server="httpServerRequestEndpoint">
             <http:POST path="/test">
-              <http:headers content-type="text/xml" accept="text/xml, */*">
+              <http:headers content-type="application/xml" accept="application/xml">
                 <http:header name="Authorization" value="Basic c29tZVVzZXJuYW1lOnNvbWVQYXNzd29yZA=="/>
               </http:headers>
               <http:body>
@@ -82,7 +66,7 @@
 
           <http:send-response server="httpServerResponseEndpoint">
             <http:headers status="200" reason-phrase="OK" version="HTTP/1.1">
-              <http:header name="Content-Type" value="text/xml"/>
+              <http:header name="Content-Type" value="application/xml"/>
               <http:header name="citrus_jms_correlationId" value="${correlation_id}"/>
             </http:headers>
             <http:body>
@@ -99,18 +83,20 @@
       </parallel>
 
       <assert exception="com.consol.citrus.exceptions.ValidationException" message="DateRangeValidationMatcher failed for field 'timestamp'. Date '${outsideRangeTimestamp}' not in range: ${rangeFrom} - ${rangeTo}">
-        <http:receive-response client="httpClient">
-          <http:headers status="200" reason-phrase="OK" version="HTTP/1.1"/>
-          <http:body>
-            <http:data>
-              <![CDATA[
-                <testResponseMessage>
-                  <timestamp>@dateRange('${rangeFrom}','${rangeTo}')@</timestamp>
-                </testResponseMessage>
-              ]]>
-            </http:data>
-          </http:body>
-        </http:receive-response>
+        <when>
+          <http:receive-response client="httpClient">
+            <http:headers status="200" reason-phrase="OK" version="HTTP/1.1"/>
+            <http:body>
+              <http:data>
+                <![CDATA[
+                  <testResponseMessage>
+                    <timestamp>@dateRange('${rangeFrom}','${rangeTo}')@</timestamp>
+                  </testResponseMessage>
+                ]]>
+              </http:data>
+            </http:body>
+          </http:receive-response>
+        </when>
       </assert>
     </actions>
   </testcase>

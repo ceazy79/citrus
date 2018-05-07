@@ -19,12 +19,12 @@ package com.consol.citrus.dsl.runner;
 import com.consol.citrus.TestCase;
 import com.consol.citrus.actions.AbstractTestAction;
 import com.consol.citrus.container.Iterate;
-import com.consol.citrus.container.IteratingConditionExpression;
 import com.consol.citrus.context.TestContext;
 import com.consol.citrus.testng.AbstractTestNGUnitTest;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.hamcrest.Matchers.lessThan;
 import static org.testng.Assert.assertEquals;
 
 public class IterateTestRunnerTest extends AbstractTestNGUnitTest {
@@ -100,12 +100,35 @@ public class IterateTestRunnerTest extends AbstractTestNGUnitTest {
             public void execute() {
                 iterate().startsWith(0)
                             .step(1)
-                            .condition(new IteratingConditionExpression() {
-                                @Override
-                                public boolean evaluate(int index, TestContext context) {
-                                    return index < 5;
-                                }
-                            })
+                            .condition((index, context) -> index < 5)
+                    .actions(createVariable("index", "${i}"));
+            }
+        };
+
+        TestContext context = builder.getTestContext();
+        Assert.assertNotNull(context.getVariable("i"));
+        Assert.assertEquals(context.getVariable("i"), "4");
+
+        TestCase test = builder.getTestCase();
+        assertEquals(test.getActionCount(), 1);
+        assertEquals(test.getActions().get(0).getClass(), Iterate.class);
+        assertEquals(test.getActions().get(0).getName(), "iterate");
+
+        Iterate container = (Iterate)test.getActions().get(0);
+        assertEquals(container.getActionCount(), 1);
+        assertEquals(container.getIndexName(), "i");
+        assertEquals(container.getStep(), 1);
+        assertEquals(container.getStart(), 0);
+    }
+
+    @Test
+    public void testIterateBuilderWithHamcrestConditionExpression() {
+        MockTestRunner builder = new MockTestRunner(getClass().getSimpleName(), applicationContext, context) {
+            @Override
+            public void execute() {
+                iterate().startsWith(0)
+                            .step(1)
+                            .condition(lessThan(5))
                     .actions(createVariable("index", "${i}"));
             }
         };

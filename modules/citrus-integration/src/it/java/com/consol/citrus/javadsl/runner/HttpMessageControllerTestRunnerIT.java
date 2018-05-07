@@ -17,9 +17,6 @@
 package com.consol.citrus.javadsl.runner;
 
 import com.consol.citrus.annotations.CitrusTest;
-import com.consol.citrus.dsl.builder.ReceiveMessageBuilder;
-import com.consol.citrus.dsl.builder.SendMessageBuilder;
-import com.consol.citrus.dsl.builder.BuilderSupport;
 import com.consol.citrus.dsl.testng.TestNGCitrusTestRunner;
 import com.consol.citrus.http.message.HttpMessage;
 import org.springframework.http.HttpMethod;
@@ -39,137 +36,122 @@ public class HttpMessageControllerTestRunnerIT extends TestNGCitrusTestRunner {
         echo("First request without query parameter and context path variables.");
         
         parallel().actions(
-                send(new BuilderSupport<SendMessageBuilder>() {
-                    @Override
-                    public void configure(SendMessageBuilder builder) {
-                        builder.endpoint("httpClient")
-                                .http()
-                                .uri("http://localhost:8072")
+                http(builder -> builder.client("httpClient")
+                        .send()
+                        .get()
+                        .uri("http://localhost:8072")
+                        .message(new HttpMessage()
+                                .method(HttpMethod.GET)
+                                .contentType("text/html")
+                                .accept("application/xml;charset=UTF-8"))),
+
+                sequential().actions(
+                        http(builder -> builder.server("httpServerRequestEndpoint")
+                                .receive()
+                                .get()
                                 .message(new HttpMessage()
                                         .method(HttpMethod.GET)
                                         .contentType("text/html")
-                                        .accept("application/xml;charset=UTF-8"));
-                    }
-                }),
-
-                sequential().actions(
-                        receive(new BuilderSupport<ReceiveMessageBuilder>() {
-                            @Override
-                            public void configure(ReceiveMessageBuilder builder) {
-                                builder.endpoint("httpServerRequestEndpoint")
-                                        .message(new HttpMessage()
-                                                .method(HttpMethod.GET)
-                                                .contentType("text/html")
-                                                .header("Host", "localhost:8072")
-                                                .accept("application/xml;charset=UTF-8"))
-                                        .http().uri("/").contextPath("");
-                            }
-                        }))
+                                        .header("Host", "localhost:8072")
+                                        .accept("application/xml;charset=UTF-8"))))
         );
         
-        receive(new BuilderSupport<ReceiveMessageBuilder>() {
-            @Override
-            public void configure(ReceiveMessageBuilder builder) {
-                builder.endpoint("httpClient")
-                        .timeout(2000L)
-                        .http()
-                        .status(HttpStatus.OK)
-                        .version("HTTP/1.1");
-            }
-        });
+        http(builder -> builder.client("httpClient")
+                .receive()
+                .response(HttpStatus.OK)
+                .timeout(2000L)
+                .version("HTTP/1.1"));
 
         echo("Use context path variables.");
         
         parallel().actions(
-            send(new BuilderSupport<SendMessageBuilder>() {
-                @Override
-                public void configure(SendMessageBuilder builder) {
-                    builder.endpoint("httpClient")
-                            .http()
-                            .uri("http://localhost:8072/test/user/${id}")
-                            .message(new HttpMessage()
-                                    .method(HttpMethod.GET)
-                                    .contentType("text/html")
-                                    .accept("application/xml;charset=UTF-8"));
-                }
-            }),
+            http(builder -> builder.client("httpClient")
+                    .send()
+                    .get()
+                    .uri("http://localhost:8072/test/user/${id}")
+                    .message(new HttpMessage()
+                            .method(HttpMethod.GET)
+                            .contentType("text/html")
+                            .accept("application/xml;charset=UTF-8"))),
 
             sequential().actions(
-                receive(new BuilderSupport<ReceiveMessageBuilder>() {
-                    @Override
-                    public void configure(ReceiveMessageBuilder builder) {
-                        builder.endpoint("httpServerRequestEndpoint")
-                                .http()
-                                .message(new HttpMessage()
-                                        .contentType("text/html")
-                                        .method(HttpMethod.GET)
-                                        .header("Host", "localhost:8072")
-                                        .accept("application/xml;charset=UTF-8"))
-                                .uri("/test/user/${id}")
-                                .contextPath("");
-                    }
-                }))
+                http(builder -> builder.server("httpServerRequestEndpoint")
+                        .receive()
+                        .get("/test/user/${id}")
+                        .message(new HttpMessage()
+                                .contentType("text/html")
+                                .method(HttpMethod.GET)
+                                .header("Host", "localhost:8072")
+                                .accept("application/xml;charset=UTF-8"))))
         );
         
-        receive(new BuilderSupport<ReceiveMessageBuilder>() {
-            @Override
-            public void configure(ReceiveMessageBuilder builder) {
-                builder.endpoint("httpClient")
-                        .timeout(2000L)
-                        .http()
-                        .status(HttpStatus.OK)
-                        .version("HTTP/1.1");
-            }
-        });
+        http(builder -> builder.client("httpClient")
+                .receive()
+                .response(HttpStatus.OK)
+                .timeout(2000L)
+                .version("HTTP/1.1"));
         
         echo("Use query parameter and context path variables.");
         
         parallel().actions(
-            send(new BuilderSupport<SendMessageBuilder>() {
-                @Override
-                public void configure(SendMessageBuilder builder) {
-                    builder.endpoint("httpClient")
-                            .http()
-                            .uri("http://localhost:8072/test")
-                            .message(new HttpMessage()
-                                    .method(HttpMethod.GET)
-                                    .contentType("text/html")
-                                    .queryParam("id", "${id}")
-                                    .queryParam("name", "TestUser")
-                                    .accept("application/xml;charset=UTF-8"))
-                            .path("user");
-                }
-            }),
+            http(builder -> builder.client("httpClient")
+                    .send()
+                    .get()
+                    .uri("http://localhost:8072/test")
+                    .message(new HttpMessage()
+                            .method(HttpMethod.GET)
+                            .contentType("text/html")
+                            .queryParam("id", "${id}")
+                            .queryParam("name", "TestUser")
+                            .queryParam("alive")
+                            .accept("application/xml;charset=UTF-8")
+                            .path("user"))),
 
             sequential().actions(
-                receive(new BuilderSupport<ReceiveMessageBuilder>() {
-                    @Override
-                    public void configure(ReceiveMessageBuilder builder) {
-                        builder.endpoint("httpServerRequestEndpoint")
-                                .http()
-                                .message(new HttpMessage()
-                                        .method(HttpMethod.GET)
-                                        .contentType("text/html")
-                                        .header("Host", "localhost:8072")
-                                        .accept("application/xml;charset=UTF-8"))
-                                .uri("/test/user")
-                                .contextPath("")
+                http(builder -> builder.server("httpServerRequestEndpoint")
+                        .receive()
+                        .get("/test/user")
+                        .message(new HttpMessage()
+                                .method(HttpMethod.GET)
+                                .contentType("text/html")
+                                .header("Host", "localhost:8072")
+                                .accept("application/xml;charset=UTF-8")
                                 .queryParam("id", "${id}")
-                                .queryParam("name", "TestUser");
-                    }
-                })
+                                .queryParam("name", "TestUser")
+                                .queryParam("alive")))
             )
         );
 
-        receive(new BuilderSupport<ReceiveMessageBuilder>() {
-            @Override
-            public void configure(ReceiveMessageBuilder builder) {
-                builder.endpoint("httpClient")
-                        .timeout(2000L)
-                        .http()
-                        .status(HttpStatus.OK)
-                        .version("HTTP/1.1");
-            }
-        });
+        http(builder -> builder.client("httpClient")
+                .receive()
+                .response(HttpStatus.OK)
+                .timeout(2000L)
+                .version("HTTP/1.1"));
+
+        echo("Query WSDL with special query param");
+
+        parallel().actions(
+                http(builder -> builder.client("httpClient")
+                        .send()
+                        .get()
+                        .queryParam("wsdl")
+                        .contentType("text/html")
+                        .accept("application/xml;charset=UTF-8")),
+
+                sequential().actions(
+                        http(builder -> builder.server("httpServerRequestEndpoint")
+                                .receive()
+                                .get()
+                                .contentType("text/html")
+                                .header("Host", "localhost:8072")
+                                .accept("application/xml;charset=UTF-8")
+                                .queryParam("wsdl")))
+        );
+
+        http(builder -> builder.client("httpClient")
+                .receive()
+                .response(HttpStatus.OK)
+                .timeout(2000L)
+                .version("HTTP/1.1"));
     }
 }

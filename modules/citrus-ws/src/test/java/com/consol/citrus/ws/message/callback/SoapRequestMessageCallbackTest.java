@@ -18,6 +18,7 @@ package com.consol.citrus.ws.message.callback;
 
 import com.consol.citrus.message.DefaultMessage;
 import com.consol.citrus.message.Message;
+import com.consol.citrus.testng.AbstractTestNGUnitTest;
 import com.consol.citrus.ws.client.WebServiceEndpointConfiguration;
 import com.consol.citrus.ws.message.SoapAttachment;
 import com.consol.citrus.ws.message.SoapMessageHeaders;
@@ -27,11 +28,11 @@ import org.mockito.stubbing.Answer;
 import org.springframework.core.io.InputStreamSource;
 import org.springframework.ws.soap.*;
 import org.springframework.ws.soap.saaj.SaajSoapMessage;
-import org.springframework.xml.namespace.QNameUtils;
 import org.springframework.xml.transform.StringResult;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import javax.xml.namespace.QName;
 import javax.xml.soap.*;
 import javax.xml.transform.TransformerException;
 import java.io.*;
@@ -42,7 +43,7 @@ import static org.mockito.Mockito.*;
 /**
  * @author Christoph Deppisch
  */
-public class SoapRequestMessageCallbackTest {
+public class SoapRequestMessageCallbackTest extends AbstractTestNGUnitTest {
 
     private SoapMessage soapRequest = Mockito.mock(SoapMessage.class);
     private SoapBody soapBody = Mockito.mock(SoapBody.class);
@@ -54,7 +55,7 @@ public class SoapRequestMessageCallbackTest {
     public void testSoapBody() throws TransformerException, IOException {
         Message testMessage = new DefaultMessage(requestPayload);
 
-        SoapRequestMessageCallback callback = new SoapRequestMessageCallback(testMessage, new WebServiceEndpointConfiguration());
+        SoapRequestMessageCallback callback = new SoapRequestMessageCallback(testMessage, new WebServiceEndpointConfiguration(), context);
         
         StringResult soapBodyResult = new StringResult();
         
@@ -75,7 +76,7 @@ public class SoapRequestMessageCallbackTest {
         Message testMessage = new DefaultMessage(requestPayload)
                                                     .setHeader(SoapMessageHeaders.SOAP_ACTION, "soapAction");
 
-        SoapRequestMessageCallback callback = new SoapRequestMessageCallback(testMessage, new WebServiceEndpointConfiguration());
+        SoapRequestMessageCallback callback = new SoapRequestMessageCallback(testMessage, new WebServiceEndpointConfiguration(), context);
         
         reset(soapRequest, soapBody);
         
@@ -97,7 +98,7 @@ public class SoapRequestMessageCallbackTest {
         Message testMessage = new DefaultMessage(requestPayload)
                                                     .addHeaderData(soapHeaderContent);
 
-        SoapRequestMessageCallback callback = new SoapRequestMessageCallback(testMessage, new WebServiceEndpointConfiguration());
+        SoapRequestMessageCallback callback = new SoapRequestMessageCallback(testMessage, new WebServiceEndpointConfiguration(), context);
         
         StringResult soapHeaderResult = new StringResult();
         
@@ -127,7 +128,7 @@ public class SoapRequestMessageCallbackTest {
                 .addHeaderData(soapHeaderContent)
                 .addHeaderData("<AppInfo><appId>123456789</appId></AppInfo>");
 
-        SoapRequestMessageCallback callback = new SoapRequestMessageCallback(testMessage, new WebServiceEndpointConfiguration());
+        SoapRequestMessageCallback callback = new SoapRequestMessageCallback(testMessage, new WebServiceEndpointConfiguration(), context);
 
         StringResult soapHeaderResult = new StringResult();
 
@@ -151,7 +152,7 @@ public class SoapRequestMessageCallbackTest {
                                                     .setHeader("operation", "unitTest")
                                                     .setHeader("messageId", "123456789");
 
-        SoapRequestMessageCallback callback = new SoapRequestMessageCallback(testMessage, new WebServiceEndpointConfiguration());
+        SoapRequestMessageCallback callback = new SoapRequestMessageCallback(testMessage, new WebServiceEndpointConfiguration(), context);
         
         SoapHeaderElement soapHeaderElement = Mockito.mock(SoapHeaderElement.class);
         
@@ -161,8 +162,8 @@ public class SoapRequestMessageCallbackTest {
         when(soapBody.getPayloadResult()).thenReturn(new StringResult());
         
         when(soapRequest.getSoapHeader()).thenReturn(soapHeader);
-        when(soapHeader.addHeaderElement(eq(QNameUtils.createQName("", "operation", "")))).thenReturn(soapHeaderElement);
-        when(soapHeader.addHeaderElement(eq(QNameUtils.createQName("", "messageId", "")))).thenReturn(soapHeaderElement);
+        when(soapHeader.addHeaderElement(eq(new QName("", "operation", "")))).thenReturn(soapHeaderElement);
+        when(soapHeader.addHeaderElement(eq(new QName("", "messageId", "")))).thenReturn(soapHeaderElement);
 
         callback.doWithMessage(soapRequest);
 
@@ -176,7 +177,7 @@ public class SoapRequestMessageCallbackTest {
                                                     .setHeader("{http://www.citrus.com}citrus:operation", "unitTest")
                                                     .setHeader("{http://www.citrus.com}citrus:messageId", "123456789");
 
-        SoapRequestMessageCallback callback = new SoapRequestMessageCallback(testMessage, new WebServiceEndpointConfiguration());
+        SoapRequestMessageCallback callback = new SoapRequestMessageCallback(testMessage, new WebServiceEndpointConfiguration(), context);
         
         SoapHeaderElement soapHeaderElement = Mockito.mock(SoapHeaderElement.class);
         
@@ -186,8 +187,8 @@ public class SoapRequestMessageCallbackTest {
         when(soapBody.getPayloadResult()).thenReturn(new StringResult());
         
         when(soapRequest.getSoapHeader()).thenReturn(soapHeader);
-        when(soapHeader.addHeaderElement(eq(QNameUtils.createQName("http://www.citrus.com", "operation", "citrus")))).thenReturn(soapHeaderElement);
-        when(soapHeader.addHeaderElement(eq(QNameUtils.createQName("http://www.citrus.com", "messageId", "citrus")))).thenReturn(soapHeaderElement);
+        when(soapHeader.addHeaderElement(eq(new QName("http://www.citrus.com", "operation", "citrus")))).thenReturn(soapHeaderElement);
+        when(soapHeader.addHeaderElement(eq(new QName("http://www.citrus.com", "messageId", "citrus")))).thenReturn(soapHeaderElement);
 
         callback.doWithMessage(soapRequest);
 
@@ -202,7 +203,7 @@ public class SoapRequestMessageCallbackTest {
                                                     .setHeader(SoapMessageHeaders.HTTP_PREFIX + "operation", "unitTest")
                                                     .setHeader(SoapMessageHeaders.HTTP_PREFIX + "messageId", "123456789");
 
-        SoapRequestMessageCallback callback = new SoapRequestMessageCallback(testMessage, new WebServiceEndpointConfiguration());
+        SoapRequestMessageCallback callback = new SoapRequestMessageCallback(testMessage, new WebServiceEndpointConfiguration(), context);
         
         
         SaajSoapMessage saajSoapRequest = Mockito.mock(SaajSoapMessage.class);
@@ -242,7 +243,7 @@ public class SoapRequestMessageCallbackTest {
         com.consol.citrus.ws.message.SoapMessage testMessage = new com.consol.citrus.ws.message.SoapMessage(requestPayload)
                 .addAttachment(attachment);
 
-        SoapRequestMessageCallback callback = new SoapRequestMessageCallback(testMessage, new WebServiceEndpointConfiguration());
+        SoapRequestMessageCallback callback = new SoapRequestMessageCallback(testMessage, new WebServiceEndpointConfiguration(), context);
         
         reset(soapRequest, soapBody);
         

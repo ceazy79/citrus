@@ -16,6 +16,7 @@
 
 package com.consol.citrus.jms.message;
 
+import com.consol.citrus.context.TestContext;
 import org.springframework.jms.support.JmsUtils;
 import org.springframework.messaging.MessageHeaders;
 import com.consol.citrus.exceptions.CitrusRuntimeException;
@@ -37,14 +38,14 @@ import java.util.*;
 public class JmsMessageConverter implements MessageConverter<javax.jms.Message, JmsEndpointConfiguration> {
 
     @Override
-    public javax.jms.Message convertOutbound(Message message, JmsEndpointConfiguration endpointConfiguration) {
+    public javax.jms.Message convertOutbound(Message message, JmsEndpointConfiguration endpointConfiguration, TestContext context) {
         Connection connection = null;
         Session session = null;
 
         try {
             connection = endpointConfiguration.getConnectionFactory().createConnection();
             session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
-            return createJmsMessage(message, session, endpointConfiguration);
+            return createJmsMessage(message, session, endpointConfiguration, context);
         } catch (JMSException e) {
             throw new CitrusRuntimeException("Failed to create JMS message", e);
         } finally {
@@ -54,7 +55,7 @@ public class JmsMessageConverter implements MessageConverter<javax.jms.Message, 
     }
 
     @Override
-    public void convertOutbound(javax.jms.Message jmsMessage, Message message, JmsEndpointConfiguration endpointConfiguration) {
+    public void convertOutbound(javax.jms.Message jmsMessage, Message message, JmsEndpointConfiguration endpointConfiguration, TestContext context) {
         Map<String, Object> headers = message.getHeaders();
 
         if (headers != null) {
@@ -63,13 +64,13 @@ public class JmsMessageConverter implements MessageConverter<javax.jms.Message, 
     }
 
     @Override
-    public Message convertInbound(javax.jms.Message jmsMessage, JmsEndpointConfiguration endpointConfiguration) {
+    public Message convertInbound(javax.jms.Message jmsMessage, JmsEndpointConfiguration endpointConfiguration, TestContext context) {
         if (jmsMessage == null) {
             return null;
         }
 
         try {
-            Map<String, Object> headers = endpointConfiguration.getHeaderMapper().toHeaders(jmsMessage);
+            MessageHeaders headers = endpointConfiguration.getHeaderMapper().toHeaders(jmsMessage);
             Object payload;
 
             if (jmsMessage instanceof TextMessage) {
@@ -94,7 +95,6 @@ public class JmsMessageConverter implements MessageConverter<javax.jms.Message, 
 
             if (payload instanceof Message) {
                 Message nestedMessage = (Message) payload;
-
                 for (Map.Entry<String, Object> headerEntry : headers.entrySet()) {
                     if (!headerEntry.getKey().startsWith(com.consol.citrus.message.MessageHeaders.MESSAGE_PREFIX)) {
                         nestedMessage.setHeader(headerEntry.getKey(), headerEntry.getValue());
@@ -103,7 +103,14 @@ public class JmsMessageConverter implements MessageConverter<javax.jms.Message, 
 
                 return nestedMessage;
             } else {
-                return new JmsMessage(payload, headers);
+                JmsMessage message = new JmsMessage(payload);
+                for (Map.Entry<String, Object> headerEntry : headers.entrySet()) {
+                    if (!headerEntry.getKey().startsWith(com.consol.citrus.message.MessageHeaders.MESSAGE_PREFIX)) {
+                        message.setHeader(headerEntry.getKey(), headerEntry.getValue());
+                    }
+                }
+
+                return message;
             }
         } catch (JMSException e) {
             throw new CitrusRuntimeException("Failed to convert jms message", e);
@@ -117,9 +124,10 @@ public class JmsMessageConverter implements MessageConverter<javax.jms.Message, 
      * @param message
      * @param session
      * @param endpointConfiguration
+     * @param context
      * @return
      */
-    public javax.jms.Message createJmsMessage(Message message, Session session, JmsEndpointConfiguration endpointConfiguration) {
+    public javax.jms.Message createJmsMessage(Message message, Session session, JmsEndpointConfiguration endpointConfiguration, TestContext context) {
         try {
             Object payload = message.getPayload();
 
@@ -148,7 +156,7 @@ public class JmsMessageConverter implements MessageConverter<javax.jms.Message, 
                 throw new CitrusRuntimeException("Cannot convert object of type [" + payload + "] to JMS message. Supported message " +
                         "payloads are: String, byte array, Map<String,?>, Serializable object.");
             }
-            convertOutbound(jmsMessage, message, endpointConfiguration);
+            convertOutbound(jmsMessage, message, endpointConfiguration, context);
 
             return jmsMessage;
         } catch (JMSException e) {

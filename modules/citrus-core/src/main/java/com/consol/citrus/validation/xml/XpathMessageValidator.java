@@ -20,7 +20,6 @@ import com.consol.citrus.context.TestContext;
 import com.consol.citrus.exceptions.UnknownElementException;
 import com.consol.citrus.exceptions.ValidationException;
 import com.consol.citrus.message.Message;
-import com.consol.citrus.message.MessageType;
 import com.consol.citrus.util.XMLUtils;
 import com.consol.citrus.validation.AbstractMessageValidator;
 import com.consol.citrus.validation.ValidationUtils;
@@ -52,14 +51,14 @@ public class XpathMessageValidator extends AbstractMessageValidator<XpathMessage
     private NamespaceContextBuilder namespaceContextBuilder = new NamespaceContextBuilder();
 
     @Override
-    public void validateMessage(Message receivedMessage,Message controlMessage, TestContext context, XpathMessageValidationContext validationContext) throws ValidationException {
+    public void validateMessage(Message receivedMessage, Message controlMessage, TestContext context, XpathMessageValidationContext validationContext) throws ValidationException {
         if (CollectionUtils.isEmpty(validationContext.getXpathExpressions())) { return; }
 
         if (receivedMessage.getPayload() == null || !StringUtils.hasText(receivedMessage.getPayload(String.class))) {
             throw new ValidationException("Unable to validate message elements - receive message payload was empty");
         }
 
-        log.debug("Start XPath element validation");
+        log.debug("Start XPath element validation ...");
 
         Document received = XMLUtils.parseMessagePayload(receivedMessage.getPayload(String.class));
         NamespaceContext namespaceContext = namespaceContextBuilder.buildContext(
@@ -68,10 +67,10 @@ public class XpathMessageValidator extends AbstractMessageValidator<XpathMessage
         for (Map.Entry<String, Object> entry : validationContext.getXpathExpressions().entrySet()) {
             String xPathExpression = entry.getKey();
             Object expectedValue = entry.getValue();
-            String actualValue;
 
             xPathExpression = context.replaceDynamicContentInString(xPathExpression);
 
+            Object xPathResult;
             if (XPathUtils.isXPathExpression(xPathExpression)) {
                 XPathExpressionResult resultType = XPathExpressionResult.fromString(
                         xPathExpression, XPathExpressionResult.NODE);
@@ -85,7 +84,7 @@ public class XpathMessageValidator extends AbstractMessageValidator<XpathMessage
                     continue;
                 }
 
-                actualValue = XPathUtils.evaluate(received,
+                xPathResult = XPathUtils.evaluate(received,
                         xPathExpression,
                         namespaceContext,
                         resultType);
@@ -101,7 +100,7 @@ public class XpathMessageValidator extends AbstractMessageValidator<XpathMessage
                     continue;
                 }
 
-                actualValue = getNodeValue(node);
+                xPathResult = getNodeValue(node);
             }
 
             if (expectedValue instanceof String) {
@@ -110,7 +109,7 @@ public class XpathMessageValidator extends AbstractMessageValidator<XpathMessage
             }
 
             //do the validation of actual and expected value for element
-            ValidationUtils.validateValues(actualValue, expectedValue, xPathExpression, context);
+            ValidationUtils.validateValues(xPathResult, expectedValue, xPathExpression, context);
 
             if (log.isDebugEnabled()) {
                 log.debug("Validating element: " + xPathExpression + "='" + expectedValue + "': OK.");
@@ -127,7 +126,7 @@ public class XpathMessageValidator extends AbstractMessageValidator<XpathMessage
 
     @Override
     public boolean supportsMessageType(String messageType, Message message) {
-        return messageType.equalsIgnoreCase(MessageType.XML.toString());
+        return new DomXmlMessageValidator().supportsMessageType(messageType, message);
     }
 
     /**

@@ -20,7 +20,7 @@ import com.consol.citrus.config.util.BeanDefinitionParserUtils;
 import com.consol.citrus.config.xml.AbstractEndpointParser;
 import com.consol.citrus.endpoint.Endpoint;
 import com.consol.citrus.endpoint.EndpointConfiguration;
-import com.consol.citrus.websocket.endpoint.WebSocketClientEndpointConfiguration;
+import com.consol.citrus.websocket.client.WebSocketClientEndpointConfiguration;
 import com.consol.citrus.websocket.endpoint.WebSocketEndpoint;
 import org.springframework.beans.factory.support.BeanDefinitionBuilder;
 import org.springframework.beans.factory.xml.ParserContext;
@@ -43,6 +43,7 @@ public class WebSocketClientParser extends AbstractEndpointParser {
         }
 
         BeanDefinitionParserUtils.setPropertyValue(endpointConfiguration, element.getAttribute("url"), "endpointUri");
+        BeanDefinitionParserUtils.setPropertyReference(endpointConfiguration, element.getAttribute("http-headers"), "webSocketHttpHeaders");
         BeanDefinitionParserUtils.setPropertyReference(endpointConfiguration, element.getAttribute("message-converter"), "messageConverter");
         BeanDefinitionParserUtils.setPropertyReference(endpointConfiguration, element.getAttribute("endpoint-resolver"), "endpointUriResolver");
         BeanDefinitionParserUtils.setPropertyValue(endpointConfiguration, element.getAttribute("polling-interval"), "pollingInterval");

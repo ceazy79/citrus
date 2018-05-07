@@ -18,7 +18,6 @@ package com.consol.citrus.dsl.design;
 
 import com.consol.citrus.TestAction;
 import com.consol.citrus.dsl.builder.FinallySequenceBuilder;
-import com.consol.citrus.dsl.util.PositionHandle;
 
 /**
  * Abstract Citrus test behavior provides interface method implementations for
@@ -55,12 +54,8 @@ public abstract class AbstractTestBehavior extends DefaultTestDesigner implement
     }
 
     @Override
-    public FinallySequenceBuilder doFinally(TestAction... actions) {
-        return target.doFinally(actions);
+    public FinallySequenceBuilder doFinally() {
+        return target.doFinally();
     }
 
-    @Override
-    public PositionHandle positionHandle() {
-        return target.positionHandle();
-    }
 }

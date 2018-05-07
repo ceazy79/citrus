@@ -20,6 +20,7 @@ import com.consol.citrus.exceptions.ActionTimeoutException;
 import com.consol.citrus.message.DefaultMessage;
 import com.consol.citrus.message.Message;
 import com.consol.citrus.testng.AbstractTestNGUnitTest;
+import com.consol.citrus.websocket.client.WebSocketClientEndpointConfiguration;
 import com.consol.citrus.websocket.handler.CitrusWebSocketHandler;
 import com.consol.citrus.websocket.message.WebSocketMessage;
 import org.mockito.Mockito;
@@ -27,11 +28,12 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.springframework.util.concurrent.ListenableFuture;
 import org.springframework.util.concurrent.SettableListenableFuture;
-import org.springframework.web.socket.TextMessage;
-import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.*;
 import org.springframework.web.socket.client.WebSocketClient;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import java.net.URI;
 
 import static org.mockito.Mockito.*;
 
@@ -69,7 +71,7 @@ public class WebSocketClientTest extends AbstractTestNGUnitTest {
 
                 return future;
             }
-        }).when(client).doHandshake(any(CitrusWebSocketHandler.class), eq(endpointUri));
+        }).when(client).doHandshake(any(CitrusWebSocketHandler.class), any(WebSocketHttpHeaders.class), any(URI.class));
 
         when(session.getId()).thenReturn("test-socket-1");
         when(session.isOpen()).thenReturn(true);
@@ -119,7 +121,7 @@ public class WebSocketClientTest extends AbstractTestNGUnitTest {
                 handler.afterConnectionEstablished(session);
                 return future;
             }
-        }).when(client).doHandshake(any(CitrusWebSocketHandler.class), eq(endpointUri));
+        }).when(client).doHandshake(any(CitrusWebSocketHandler.class), any(WebSocketHttpHeaders.class), any(URI.class));
 
         when(session.getId()).thenReturn("test-socket-1");
         when(session.isOpen()).thenReturn(true);

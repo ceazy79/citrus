@@ -17,8 +17,6 @@
 package com.consol.citrus.javadsl.runner;
 
 import com.consol.citrus.annotations.CitrusTest;
-import com.consol.citrus.dsl.builder.*;
-import com.consol.citrus.dsl.builder.BuilderSupport;
 import com.consol.citrus.dsl.testng.TestNGCitrusTestRunner;
 import com.consol.citrus.ws.validation.SoapFaultValidator;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,49 +43,35 @@ public class ServerSoapFaultTestRunnerIT extends TestNGCitrusTestRunner {
             assertSoapFault().faultCode("{http://www.citrusframework.org/faults}TEC-1000")
                             .faultString("Invalid request")
                 .when(
-                    send(new BuilderSupport<SendMessageBuilder>() {
-                        @Override
-                        public void configure(SendMessageBuilder builder) {
-                            builder.endpoint("webServiceClient")
-                                    .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
-                                            "<ns0:MessageId>${messageId}</ns0:MessageId>" +
-                                            "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
-                                            "<ns0:User>${user}</ns0:User>" +
-                                            "<ns0:Text>Hello WebServer</ns0:Text>" +
-                                            "</ns0:HelloRequest>");
-                        }
-                    })
-            ),
-            sequential().actions(
-                receive(new BuilderSupport<ReceiveMessageBuilder>() {
-                    @Override
-                    public void configure(ReceiveMessageBuilder builder) {
-                        builder.endpoint("webServiceRequestReceiver")
-                                .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
+                    send(builder -> builder.endpoint("webServiceClient")
+                            .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
                                         "<ns0:MessageId>${messageId}</ns0:MessageId>" +
                                         "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
                                         "<ns0:User>${user}</ns0:User>" +
                                         "<ns0:Text>Hello WebServer</ns0:Text>" +
-                                        "</ns0:HelloRequest>")
-                                .schemaValidation(false)
-                                .extractFromHeader("citrus_jms_messageId", "internal_correlation_id");
-                    }
-                }),
-                sendSoapFault(new BuilderSupport<SendSoapFaultBuilder>() {
-                    @Override
-                    public void configure(SendSoapFaultBuilder builder) {
-                        builder.endpoint("webServiceResponseSender")
-                                .faultCode("{http://www.citrusframework.org/faults}citrus-ns:TEC-1000")
-                                .faultString("Invalid request")
-                                .faultDetail("<ns0:FaultDetail xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
-                                        "<ns0:MessageId>${messageId}</ns0:MessageId>" +
-                                        "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
-                                        "<ns0:ErrorCode>TEC-1000</ns0:ErrorCode>" +
-                                        "<ns0:Text>Invalid request</ns0:Text>" +
-                                        "</ns0:FaultDetail>")
-                                .header("citrus_jms_correlationId", "${internal_correlation_id}");
-                    }
-                })
+                                    "</ns0:HelloRequest>"))
+            ),
+            sequential().actions(
+                receive(builder -> builder.endpoint("webServiceRequestReceiver")
+                        .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
+                                    "<ns0:MessageId>${messageId}</ns0:MessageId>" +
+                                    "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
+                                    "<ns0:User>${user}</ns0:User>" +
+                                    "<ns0:Text>Hello WebServer</ns0:Text>" +
+                                "</ns0:HelloRequest>")
+                        .schemaValidation(false)
+                        .extractFromHeader("citrus_jms_messageId", "internal_correlation_id")),
+                soap(builder -> builder.server("webServiceResponseSender")
+                        .sendFault()
+                        .faultCode("{http://www.citrusframework.org/faults}citrus-ns:TEC-1000")
+                        .faultString("Invalid request")
+                        .faultDetail("<ns0:FaultDetail xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
+                                    "<ns0:MessageId>${messageId}</ns0:MessageId>" +
+                                    "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
+                                    "<ns0:ErrorCode>TEC-1000</ns0:ErrorCode>" +
+                                    "<ns0:Text>Invalid request</ns0:Text>" +
+                                "</ns0:FaultDetail>")
+                        .header("citrus_jms_correlationId", "${internal_correlation_id}"))
             )
         );
         
@@ -98,50 +82,36 @@ public class ServerSoapFaultTestRunnerIT extends TestNGCitrusTestRunner {
                             .faultString("Invalid request")
                             .faultActor("SERVER")
                 .when(
-                    send(new BuilderSupport<SendMessageBuilder>() {
-                        @Override
-                        public void configure(SendMessageBuilder builder) {
-                            builder.endpoint("webServiceClient")
-                                    .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
-                                            "<ns0:MessageId>${messageId}</ns0:MessageId>" +
-                                            "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
-                                            "<ns0:User>${user}</ns0:User>" +
-                                            "<ns0:Text>Hello WebServer</ns0:Text>" +
-                                            "</ns0:HelloRequest>");
-                        }
-                    })
-            ),
-            sequential().actions(
-                receive(new BuilderSupport<ReceiveMessageBuilder>() {
-                    @Override
-                    public void configure(ReceiveMessageBuilder builder) {
-                        builder.endpoint("webServiceRequestReceiver")
-                                .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
+                    send(builder -> builder.endpoint("webServiceClient")
+                            .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
                                         "<ns0:MessageId>${messageId}</ns0:MessageId>" +
                                         "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
                                         "<ns0:User>${user}</ns0:User>" +
                                         "<ns0:Text>Hello WebServer</ns0:Text>" +
-                                        "</ns0:HelloRequest>")
-                                .schemaValidation(false)
-                                .extractFromHeader("citrus_jms_messageId", "internal_correlation_id");
-                    }
-                }),
-                sendSoapFault(new BuilderSupport<SendSoapFaultBuilder>() {
-                    @Override
-                    public void configure(SendSoapFaultBuilder builder) {
-                        builder.endpoint("webServiceResponseSender")
-                                .faultCode("{http://www.citrusframework.org/faults}citrus-ns:TEC-1000")
-                                .faultString("Invalid request")
-                                .faultActor("SERVER")
-                                .faultDetail("<ns0:FaultDetail xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
-                                        "<ns0:MessageId>${messageId}</ns0:MessageId>" +
-                                        "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
-                                        "<ns0:ErrorCode>TEC-1000</ns0:ErrorCode>" +
-                                        "<ns0:Text>Invalid request</ns0:Text>" +
-                                        "</ns0:FaultDetail>")
-                                .header("citrus_jms_correlationId", "${internal_correlation_id}");
-                    }
-                })
+                                    "</ns0:HelloRequest>"))
+            ),
+            sequential().actions(
+                receive(builder -> builder.endpoint("webServiceRequestReceiver")
+                        .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
+                                    "<ns0:MessageId>${messageId}</ns0:MessageId>" +
+                                    "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
+                                    "<ns0:User>${user}</ns0:User>" +
+                                    "<ns0:Text>Hello WebServer</ns0:Text>" +
+                                "</ns0:HelloRequest>")
+                        .schemaValidation(false)
+                        .extractFromHeader("citrus_jms_messageId", "internal_correlation_id")),
+                soap(builder -> builder.server("webServiceResponseSender")
+                        .sendFault()
+                        .faultCode("{http://www.citrusframework.org/faults}citrus-ns:TEC-1000")
+                        .faultString("Invalid request")
+                        .faultActor("SERVER")
+                        .faultDetail("<ns0:FaultDetail xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
+                                    "<ns0:MessageId>${messageId}</ns0:MessageId>" +
+                                    "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
+                                    "<ns0:ErrorCode>TEC-1000</ns0:ErrorCode>" +
+                                    "<ns0:Text>Invalid request</ns0:Text>" +
+                                "</ns0:FaultDetail>")
+                        .header("citrus_jms_correlationId", "${internal_correlation_id}"))
             )
         );
         
@@ -151,56 +121,42 @@ public class ServerSoapFaultTestRunnerIT extends TestNGCitrusTestRunner {
             assertSoapFault().faultCode("{http://www.citrusframework.org/faults}TEC-1000")
                             .faultString("Invalid request")
                             .faultDetail("<ns0:FaultDetail xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
-                                    "<ns0:MessageId>${messageId}</ns0:MessageId>" +
-                                    "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
-                                    "<ns0:ErrorCode>TEC-1000</ns0:ErrorCode>" +
-                                    "<ns0:Text>Invalid request</ns0:Text>" +
-                                    "</ns0:FaultDetail>")
-                            .validator(soapFaultValidator)
-                .when(
-                    send(new BuilderSupport<SendMessageBuilder>() {
-                        @Override
-                        public void configure(SendMessageBuilder builder) {
-                            builder.endpoint("webServiceClient")
-                                    .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
-                                            "<ns0:MessageId>${messageId}</ns0:MessageId>" +
-                                            "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
-                                            "<ns0:User>${user}</ns0:User>" +
-                                            "<ns0:Text>Hello WebServer</ns0:Text>" +
-                                            "</ns0:HelloRequest>");
-                        }
-                    })
-            ),
-            sequential().actions(
-                receive(new BuilderSupport<ReceiveMessageBuilder>() {
-                    @Override
-                    public void configure(ReceiveMessageBuilder builder) {
-                        builder.endpoint("webServiceRequestReceiver")
-                                .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
-                                        "<ns0:MessageId>${messageId}</ns0:MessageId>" +
-                                        "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
-                                        "<ns0:User>${user}</ns0:User>" +
-                                        "<ns0:Text>Hello WebServer</ns0:Text>" +
-                                        "</ns0:HelloRequest>")
-                                .schemaValidation(false)
-                                .extractFromHeader("citrus_jms_messageId", "internal_correlation_id");
-                    }
-                }),
-                sendSoapFault(new BuilderSupport<SendSoapFaultBuilder>() {
-                    @Override
-                    public void configure(SendSoapFaultBuilder builder) {
-                        builder.endpoint("webServiceResponseSender")
-                                .faultCode("{http://www.citrusframework.org/faults}citrus-ns:TEC-1000")
-                                .faultString("Invalid request")
-                                .faultDetail("<ns0:FaultDetail xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
                                         "<ns0:MessageId>${messageId}</ns0:MessageId>" +
                                         "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
                                         "<ns0:ErrorCode>TEC-1000</ns0:ErrorCode>" +
                                         "<ns0:Text>Invalid request</ns0:Text>" +
-                                        "</ns0:FaultDetail>")
-                                .header("citrus_jms_correlationId", "${internal_correlation_id}");
-                    }
-                })
+                                    "</ns0:FaultDetail>")
+                            .validator(soapFaultValidator)
+                .when(
+                    send(builder -> builder.endpoint("webServiceClient")
+                            .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
+                                        "<ns0:MessageId>${messageId}</ns0:MessageId>" +
+                                        "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
+                                        "<ns0:User>${user}</ns0:User>" +
+                                        "<ns0:Text>Hello WebServer</ns0:Text>" +
+                                    "</ns0:HelloRequest>"))
+            ),
+            sequential().actions(
+                receive(builder -> builder.endpoint("webServiceRequestReceiver")
+                        .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
+                                    "<ns0:MessageId>${messageId}</ns0:MessageId>" +
+                                    "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
+                                    "<ns0:User>${user}</ns0:User>" +
+                                    "<ns0:Text>Hello WebServer</ns0:Text>" +
+                                "</ns0:HelloRequest>")
+                        .schemaValidation(false)
+                        .extractFromHeader("citrus_jms_messageId", "internal_correlation_id")),
+                soap(builder -> builder.server("webServiceResponseSender")
+                        .sendFault()
+                        .faultCode("{http://www.citrusframework.org/faults}citrus-ns:TEC-1000")
+                        .faultString("Invalid request")
+                        .faultDetail("<ns0:FaultDetail xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
+                                    "<ns0:MessageId>${messageId}</ns0:MessageId>" +
+                                    "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
+                                    "<ns0:ErrorCode>TEC-1000</ns0:ErrorCode>" +
+                                    "<ns0:Text>Invalid request</ns0:Text>" +
+                                "</ns0:FaultDetail>")
+                        .header("citrus_jms_correlationId", "${internal_correlation_id}"))
             )
         );
         
@@ -210,56 +166,42 @@ public class ServerSoapFaultTestRunnerIT extends TestNGCitrusTestRunner {
             assertSoapFault().faultCode("{http://www.citrusframework.org/faults}TEC-1000")
                             .faultString("Invalid request")
                             .faultDetail("<ns0:FaultDetail xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
-                                    "<ns0:MessageId>${messageId}</ns0:MessageId>" +
-                                    "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
-                                    "<ns0:ErrorCode>TEC-1000</ns0:ErrorCode>" +
-                                    "<ns0:Text>Invalid request</ns0:Text>" +
-                                    "</ns0:FaultDetail>")
-                            .schemaValidation(false)
-                .when(
-                    send(new BuilderSupport<SendMessageBuilder>() {
-                        @Override
-                        public void configure(SendMessageBuilder builder) {
-                            builder.endpoint("webServiceClient")
-                                    .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
-                                            "<ns0:MessageId>${messageId}</ns0:MessageId>" +
-                                            "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
-                                            "<ns0:User>${user}</ns0:User>" +
-                                            "<ns0:Text>Hello WebServer</ns0:Text>" +
-                                            "</ns0:HelloRequest>");
-                        }
-                    })
-            ),
-            sequential().actions(
-                receive(new BuilderSupport<ReceiveMessageBuilder>() {
-                    @Override
-                    public void configure(ReceiveMessageBuilder builder) {
-                        builder.endpoint("webServiceRequestReceiver")
-                                .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
-                                        "<ns0:MessageId>${messageId}</ns0:MessageId>" +
-                                        "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
-                                        "<ns0:User>${user}</ns0:User>" +
-                                        "<ns0:Text>Hello WebServer</ns0:Text>" +
-                                        "</ns0:HelloRequest>")
-                                .schemaValidation(false)
-                                .extractFromHeader("citrus_jms_messageId", "internal_correlation_id");
-                    }
-                }),
-                sendSoapFault(new BuilderSupport<SendSoapFaultBuilder>() {
-                    @Override
-                    public void configure(SendSoapFaultBuilder builder) {
-                        builder.endpoint("webServiceResponseSender")
-                                .faultCode("{http://www.citrusframework.org/faults}citrus-ns:TEC-1000")
-                                .faultString("Invalid request")
-                                .faultDetail("<ns0:FaultDetail xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
                                         "<ns0:MessageId>${messageId}</ns0:MessageId>" +
                                         "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
                                         "<ns0:ErrorCode>TEC-1000</ns0:ErrorCode>" +
                                         "<ns0:Text>Invalid request</ns0:Text>" +
-                                        "</ns0:FaultDetail>")
-                                .header("citrus_jms_correlationId", "${internal_correlation_id}");
-                    }
-                })
+                                    "</ns0:FaultDetail>")
+                            .schemaValidation(false)
+                .when(
+                    send(builder -> builder.endpoint("webServiceClient")
+                            .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
+                                        "<ns0:MessageId>${messageId}</ns0:MessageId>" +
+                                        "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
+                                        "<ns0:User>${user}</ns0:User>" +
+                                        "<ns0:Text>Hello WebServer</ns0:Text>" +
+                                    "</ns0:HelloRequest>"))
+            ),
+            sequential().actions(
+                receive(builder -> builder.endpoint("webServiceRequestReceiver")
+                        .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
+                                    "<ns0:MessageId>${messageId}</ns0:MessageId>" +
+                                    "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
+                                    "<ns0:User>${user}</ns0:User>" +
+                                    "<ns0:Text>Hello WebServer</ns0:Text>" +
+                                "</ns0:HelloRequest>")
+                        .schemaValidation(false)
+                        .extractFromHeader("citrus_jms_messageId", "internal_correlation_id")),
+                soap(builder -> builder.server("webServiceResponseSender")
+                        .sendFault()
+                        .faultCode("{http://www.citrusframework.org/faults}citrus-ns:TEC-1000")
+                        .faultString("Invalid request")
+                        .faultDetail("<ns0:FaultDetail xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
+                                    "<ns0:MessageId>${messageId}</ns0:MessageId>" +
+                                    "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
+                                    "<ns0:ErrorCode>TEC-1000</ns0:ErrorCode>" +
+                                    "<ns0:Text>Invalid request</ns0:Text>" +
+                                "</ns0:FaultDetail>")
+                        .header("citrus_jms_correlationId", "${internal_correlation_id}"))
             )
         );
         
@@ -269,59 +211,45 @@ public class ServerSoapFaultTestRunnerIT extends TestNGCitrusTestRunner {
             assertSoapFault().faultCode("{http://www.citrusframework.org/faults}TEC-1000")
                             .faultString("Invalid request")
                             .faultDetail("<ns0:FaultDetail xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHelloExtended.xsd\">" +
-                                    "<ns0:MessageId>${messageId}</ns0:MessageId>" +
-                                    "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
-                                    "<ns0:ErrorCode>TEC-1000</ns0:ErrorCode>" +
-                                    "<ns0:Text>Invalid request</ns0:Text>" +
-                                    "<ns0:Reason>Client</ns0:Reason>" +
-                                    "</ns0:FaultDetail>")
-                            .validator(soapFaultValidator)
-                            .xsdSchemaRepository("helloSchemaRepository")
-                .when(
-                    send(new BuilderSupport<SendMessageBuilder>() {
-                        @Override
-                        public void configure(SendMessageBuilder builder) {
-                            builder.endpoint("webServiceClient")
-                                    .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
-                                            "<ns0:MessageId>${messageId}</ns0:MessageId>" +
-                                            "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
-                                            "<ns0:User>${user}</ns0:User>" +
-                                            "<ns0:Text>Hello WebServer</ns0:Text>" +
-                                            "</ns0:HelloRequest>");
-                        }
-                    })
-            ),
-            sequential().actions(
-                receive(new BuilderSupport<ReceiveMessageBuilder>() {
-                    @Override
-                    public void configure(ReceiveMessageBuilder builder) {
-                        builder.endpoint("webServiceRequestReceiver")
-                                .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
-                                        "<ns0:MessageId>${messageId}</ns0:MessageId>" +
-                                        "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
-                                        "<ns0:User>${user}</ns0:User>" +
-                                        "<ns0:Text>Hello WebServer</ns0:Text>" +
-                                        "</ns0:HelloRequest>")
-                                .schemaValidation(false)
-                                .extractFromHeader("citrus_jms_messageId", "internal_correlation_id");
-                    }
-                }),
-                sendSoapFault(new BuilderSupport<SendSoapFaultBuilder>() {
-                    @Override
-                    public void configure(SendSoapFaultBuilder builder) {
-                        builder.endpoint("webServiceResponseSender")
-                                .faultCode("{http://www.citrusframework.org/faults}citrus-ns:TEC-1000")
-                                .faultString("Invalid request")
-                                .faultDetail("<ns0:FaultDetail xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHelloExtended.xsd\">" +
                                         "<ns0:MessageId>${messageId}</ns0:MessageId>" +
                                         "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
                                         "<ns0:ErrorCode>TEC-1000</ns0:ErrorCode>" +
                                         "<ns0:Text>Invalid request</ns0:Text>" +
                                         "<ns0:Reason>Client</ns0:Reason>" +
-                                        "</ns0:FaultDetail>")
-                                .header("citrus_jms_correlationId", "${internal_correlation_id}");
-                    }
-                })
+                                    "</ns0:FaultDetail>")
+                            .validator(soapFaultValidator)
+                            .xsdSchemaRepository("helloSchemaRepository")
+                .when(
+                    send(builder -> builder.endpoint("webServiceClient")
+                            .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
+                                        "<ns0:MessageId>${messageId}</ns0:MessageId>" +
+                                        "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
+                                        "<ns0:User>${user}</ns0:User>" +
+                                        "<ns0:Text>Hello WebServer</ns0:Text>" +
+                                    "</ns0:HelloRequest>"))
+            ),
+            sequential().actions(
+                receive(builder -> builder.endpoint("webServiceRequestReceiver")
+                        .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
+                                    "<ns0:MessageId>${messageId}</ns0:MessageId>" +
+                                    "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
+                                    "<ns0:User>${user}</ns0:User>" +
+                                    "<ns0:Text>Hello WebServer</ns0:Text>" +
+                                "</ns0:HelloRequest>")
+                        .schemaValidation(false)
+                        .extractFromHeader("citrus_jms_messageId", "internal_correlation_id")),
+                soap(builder -> builder.server("webServiceResponseSender")
+                        .sendFault()
+                        .faultCode("{http://www.citrusframework.org/faults}citrus-ns:TEC-1000")
+                        .faultString("Invalid request")
+                        .faultDetail("<ns0:FaultDetail xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHelloExtended.xsd\">" +
+                                    "<ns0:MessageId>${messageId}</ns0:MessageId>" +
+                                    "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
+                                    "<ns0:ErrorCode>TEC-1000</ns0:ErrorCode>" +
+                                    "<ns0:Text>Invalid request</ns0:Text>" +
+                                    "<ns0:Reason>Client</ns0:Reason>" +
+                                "</ns0:FaultDetail>")
+                        .header("citrus_jms_correlationId", "${internal_correlation_id}"))
             )
         );
         
@@ -331,59 +259,45 @@ public class ServerSoapFaultTestRunnerIT extends TestNGCitrusTestRunner {
             assertSoapFault().faultCode("{http://www.citrusframework.org/faults}TEC-1000")
                             .faultString("Invalid request")
                             .faultDetail("<ns0:FaultDetail xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHelloExtended.xsd\">" +
-                                    "<ns0:MessageId>${messageId}</ns0:MessageId>" +
-                                    "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
-                                    "<ns0:ErrorCode>TEC-1000</ns0:ErrorCode>" +
-                                    "<ns0:Text>Invalid request</ns0:Text>" +
-                                    "<ns0:Reason>Client</ns0:Reason>" +
-                                    "</ns0:FaultDetail>")
-                            .validator(soapFaultValidator)
-                            .xsd("helloSchemaExtended")
-                .when(
-                    send(new BuilderSupport<SendMessageBuilder>() {
-                        @Override
-                        public void configure(SendMessageBuilder builder) {
-                            builder.endpoint("webServiceClient")
-                                    .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
-                                            "<ns0:MessageId>${messageId}</ns0:MessageId>" +
-                                            "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
-                                            "<ns0:User>${user}</ns0:User>" +
-                                            "<ns0:Text>Hello WebServer</ns0:Text>" +
-                                            "</ns0:HelloRequest>");
-                        }
-                    })
-            ),
-            sequential().actions(
-                receive(new BuilderSupport<ReceiveMessageBuilder>() {
-                    @Override
-                    public void configure(ReceiveMessageBuilder builder) {
-                        builder.endpoint("webServiceRequestReceiver")
-                                .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
-                                        "<ns0:MessageId>${messageId}</ns0:MessageId>" +
-                                        "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
-                                        "<ns0:User>${user}</ns0:User>" +
-                                        "<ns0:Text>Hello WebServer</ns0:Text>" +
-                                        "</ns0:HelloRequest>")
-                                .schemaValidation(false)
-                                .extractFromHeader("citrus_jms_messageId", "internal_correlation_id");
-                    }
-                }),
-                sendSoapFault(new BuilderSupport<SendSoapFaultBuilder>() {
-                    @Override
-                    public void configure(SendSoapFaultBuilder builder) {
-                        builder.endpoint("webServiceResponseSender")
-                                .faultCode("{http://www.citrusframework.org/faults}citrus-ns:TEC-1000")
-                                .faultString("Invalid request")
-                                .faultDetail("<ns0:FaultDetail xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHelloExtended.xsd\">" +
                                         "<ns0:MessageId>${messageId}</ns0:MessageId>" +
                                         "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
                                         "<ns0:ErrorCode>TEC-1000</ns0:ErrorCode>" +
                                         "<ns0:Text>Invalid request</ns0:Text>" +
                                         "<ns0:Reason>Client</ns0:Reason>" +
-                                        "</ns0:FaultDetail>")
-                                .header("citrus_jms_correlationId", "${internal_correlation_id}");
-                    }
-                })
+                                    "</ns0:FaultDetail>")
+                            .validator(soapFaultValidator)
+                            .xsd("helloSchemaExtended")
+                .when(
+                    send(builder -> builder.endpoint("webServiceClient")
+                            .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
+                                        "<ns0:MessageId>${messageId}</ns0:MessageId>" +
+                                        "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
+                                        "<ns0:User>${user}</ns0:User>" +
+                                        "<ns0:Text>Hello WebServer</ns0:Text>" +
+                                    "</ns0:HelloRequest>"))
+            ),
+            sequential().actions(
+                receive(builder -> builder.endpoint("webServiceRequestReceiver")
+                        .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
+                                    "<ns0:MessageId>${messageId}</ns0:MessageId>" +
+                                    "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
+                                    "<ns0:User>${user}</ns0:User>" +
+                                    "<ns0:Text>Hello WebServer</ns0:Text>" +
+                                "</ns0:HelloRequest>")
+                        .schemaValidation(false)
+                        .extractFromHeader("citrus_jms_messageId", "internal_correlation_id")),
+                soap(builder -> builder.server("webServiceResponseSender")
+                        .sendFault()
+                        .faultCode("{http://www.citrusframework.org/faults}citrus-ns:TEC-1000")
+                        .faultString("Invalid request")
+                        .faultDetail("<ns0:FaultDetail xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHelloExtended.xsd\">" +
+                                    "<ns0:MessageId>${messageId}</ns0:MessageId>" +
+                                    "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
+                                    "<ns0:ErrorCode>TEC-1000</ns0:ErrorCode>" +
+                                    "<ns0:Text>Invalid request</ns0:Text>" +
+                                    "<ns0:Reason>Client</ns0:Reason>" +
+                                "</ns0:FaultDetail>")
+                        .header("citrus_jms_correlationId", "${internal_correlation_id}"))
             )
         );
         

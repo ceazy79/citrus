@@ -46,7 +46,7 @@ public class CitrusArchiveProcessorTest {
     public void setCitrusVersion() {
         Field version = ReflectionUtils.findField(Citrus.class, "version");
         ReflectionUtils.makeAccessible(version);
-        ReflectionUtils.setField(version, Citrus.class, "2.6-SNAPSHOT");
+        ReflectionUtils.setField(version, Citrus.class, "2.7.5-SNAPSHOT");
     }
 
     @BeforeMethod
@@ -65,14 +65,20 @@ public class CitrusArchiveProcessorTest {
         archiveProcessor.process(enterpriseArchive, new TestClass(this.getClass()));
         verifyArtifact(enterpriseArchive, "/citrus-core-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-jms-.*jar");
+        verifyArtifact(enterpriseArchive, "/citrus-jdbc-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-http-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-websocket-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-ws-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-ftp-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-camel-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-docker-.*jar");
+        verifyArtifact(enterpriseArchive, "/citrus-kubernetes-.*jar");
+        verifyArtifact(enterpriseArchive, "/citrus-selenium-.*jar");
+        verifyArtifact(enterpriseArchive, "/citrus-cucumber-.*jar");
+        verifyArtifact(enterpriseArchive, "/citrus-zookeeper-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-rmi-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-jmx-.*jar");
+        verifyArtifact(enterpriseArchive, "/citrus-restdocs-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-ssh-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-mail-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-vertx-.*jar");
@@ -92,14 +98,20 @@ public class CitrusArchiveProcessorTest {
         archiveProcessor.process(enterpriseArchive, new TestClass(this.getClass()));
         verifyArtifact(enterpriseArchive, "/citrus-core-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-jms-.*jar");
+        verifyArtifact(enterpriseArchive, "/citrus-jdbc-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-http-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-websocket-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-ws-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-ftp-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-camel-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-docker-.*jar");
+        verifyArtifact(enterpriseArchive, "/citrus-kubernetes-.*jar");
+        verifyArtifact(enterpriseArchive, "/citrus-selenium-.*jar");
+        verifyArtifact(enterpriseArchive, "/citrus-cucumber-.*jar");
+        verifyArtifact(enterpriseArchive, "/citrus-zookeeper-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-rmi-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-jmx-.*jar");
+        verifyArtifact(enterpriseArchive, "/citrus-restdocs-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-ssh-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-mail-.*jar");
         verifyArtifact(enterpriseArchive, "/citrus-vertx-.*jar");
@@ -113,14 +125,20 @@ public class CitrusArchiveProcessorTest {
         archiveProcessor.process(webArchive, new TestClass(this.getClass()));
         verifyArtifact(webArchive, "/WEB-INF/lib/citrus-core-.*jar");
         verifyArtifact(webArchive, "/WEB-INF/lib/citrus-jms-.*jar");
+        verifyArtifact(webArchive, "/WEB-INF/lib/citrus-jdbc-.*jar");
         verifyArtifact(webArchive, "/WEB-INF/lib/citrus-http-.*jar");
         verifyArtifact(webArchive, "/WEB-INF/lib/citrus-websocket-.*jar");
         verifyArtifact(webArchive, "/WEB-INF/lib/citrus-ws-.*jar");
         verifyArtifact(webArchive, "/WEB-INF/lib/citrus-ftp-.*jar");
         verifyArtifact(webArchive, "/WEB-INF/lib/citrus-camel-.*jar");
         verifyArtifact(webArchive, "/WEB-INF/lib/citrus-docker-.*jar");
+        verifyArtifact(webArchive, "/WEB-INF/lib/citrus-kubernetes-.*jar");
+        verifyArtifact(webArchive, "/WEB-INF/lib/citrus-selenium-.*jar");
+        verifyArtifact(webArchive, "/WEB-INF/lib/citrus-cucumber-.*jar");
+        verifyArtifact(webArchive, "/WEB-INF/lib/citrus-zookeeper-.*jar");
         verifyArtifact(webArchive, "/WEB-INF/lib/citrus-rmi-.*jar");
         verifyArtifact(webArchive, "/WEB-INF/lib/citrus-jmx-.*jar");
+        verifyArtifact(webArchive, "/WEB-INF/lib/citrus-restdocs-.*jar");
         verifyArtifact(webArchive, "/WEB-INF/lib/citrus-ssh-.*jar");
         verifyArtifact(webArchive, "/WEB-INF/lib/citrus-mail-.*jar");
         verifyArtifact(webArchive, "/WEB-INF/lib/citrus-vertx-.*jar");

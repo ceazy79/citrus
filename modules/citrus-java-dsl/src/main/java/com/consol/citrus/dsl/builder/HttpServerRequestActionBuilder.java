@@ -20,9 +20,12 @@ import com.consol.citrus.TestAction;
 import com.consol.citrus.actions.ReceiveMessageAction;
 import com.consol.citrus.dsl.actions.DelegatingTestAction;
 import com.consol.citrus.endpoint.Endpoint;
-import com.consol.citrus.http.message.HttpMessage;
-import com.consol.citrus.message.MessageType;
+import com.consol.citrus.http.message.*;
+import com.consol.citrus.message.*;
+import com.consol.citrus.validation.builder.StaticMessageContentBuilder;
 import org.springframework.http.HttpMethod;
+
+import javax.servlet.http.Cookie;
 
 /**
  * @author Christoph Deppisch
@@ -39,16 +42,33 @@ public class HttpServerRequestActionBuilder extends ReceiveMessageBuilder<Receiv
      * @param httpServer
      */
     public HttpServerRequestActionBuilder(DelegatingTestAction<TestAction> delegate, Endpoint httpServer) {
-        super();
-        action.setEndpoint(httpServer);
-        message(httpMessage);
+        super(delegate);
+        delegate.setDelegate(new ReceiveMessageAction());
+        getAction().setEndpoint(httpServer);
+        initMessage(httpMessage);
         messageType(MessageType.XML);
-        delegate.setDelegate(action);
+        headerNameIgnoreCase(true);
+    }
+
+    /**
+     * Initialize message builder.
+     * @param message
+     */
+    private void initMessage(HttpMessage message) {
+        StaticMessageContentBuilder staticMessageContentBuilder = StaticMessageContentBuilder.withMessage(message);
+        staticMessageContentBuilder.setMessageHeaders(message.getHeaders());
+        getAction().setMessageBuilder(new HttpMessageContentBuilder(message, staticMessageContentBuilder));
     }
 
     @Override
     protected void setPayload(String payload) {
         httpMessage.setPayload(payload);
+    }
+
+    @Override
+    public HttpServerRequestActionBuilder name(String name) {
+        httpMessage.setName(name);
+        return super.name(name);
     }
 
     /**
@@ -72,14 +92,12 @@ public class HttpServerRequestActionBuilder extends ReceiveMessageBuilder<Receiv
     }
 
     /**
-     * Set the endpoint URI for the request. This works only if the HTTP endpoint used
-     * doesn't provide an own endpoint URI resolver.
-     *
-     * @param uri absolute URI to use for the endpoint
-     * @return self
+     * Adds a query param to the request uri.
+     * @param name
+     * @return
      */
-    public HttpServerRequestActionBuilder uri(String uri) {
-        httpMessage.uri(uri);
+    public HttpServerRequestActionBuilder queryParam(String name) {
+        httpMessage.queryParam(name, null);
         return this;
     }
 
@@ -121,6 +139,22 @@ public class HttpServerRequestActionBuilder extends ReceiveMessageBuilder<Receiv
      */
     public HttpServerRequestActionBuilder accept(String accept) {
         httpMessage.accept(accept);
+        return this;
+    }
+
+    /**
+     * Adds cookie to response by "Cookie" header.
+     * @param cookie
+     * @return
+     */
+    public HttpServerRequestActionBuilder cookie(Cookie cookie) {
+        httpMessage.cookie(cookie);
+        return this;
+    }
+
+    @Override
+    public HttpServerRequestActionBuilder message(Message message) {
+        HttpMessageUtils.copy(message, httpMessage);
         return this;
     }
 }

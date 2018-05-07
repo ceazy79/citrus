@@ -32,7 +32,8 @@ public class SoapMimeHeaderJavaIT extends TestNGCitrusTestDesigner {
         variable("messageId", "citrus:randomNumber(10)");
         variable("user", "Christoph");
         
-        send("webServiceClient")
+        soap().client("webServiceClient")
+            .send()
             .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
                           "<ns0:MessageId>${messageId}</ns0:MessageId>" +
                           "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
@@ -41,11 +42,11 @@ public class SoapMimeHeaderJavaIT extends TestNGCitrusTestDesigner {
                       "</ns0:HelloRequest>")
             .header("{http://citrusframework.org/test}Operation", "sayHello")
             .header("citrus_http_operation", "sayHello")
-            .header("citrus_soap_action", "sayHello")
-            .soap()
+            .soapAction("sayHello")
             .fork(true);
         
-        receive("webServiceRequestReceiver")
+        soap().server("webServiceRequestReceiver")
+            .receive()
             .payload("<ns0:HelloRequest xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
                           "<ns0:MessageId>${messageId}</ns0:MessageId>" +
                           "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
@@ -54,11 +55,12 @@ public class SoapMimeHeaderJavaIT extends TestNGCitrusTestDesigner {
                       "</ns0:HelloRequest>")
             .header("Operation", "sayHello")
             .header("operation", "sayHello")
-            .header("citrus_soap_action", "sayHello")
+            .soapAction("sayHello")
             .schemaValidation(false)
             .extractFromHeader("citrus_jms_messageId", "internal_correlation_id");
             
-        send("webServiceResponseSender")
+        soap().server("webServiceResponseSender")
+            .send()
             .payload("<ns0:HelloResponse xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
                             "<ns0:MessageId>${messageId}</ns0:MessageId>" +
                             "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +
@@ -69,7 +71,8 @@ public class SoapMimeHeaderJavaIT extends TestNGCitrusTestDesigner {
             .header("citrus_http_operation", "answerHello")
             .header("citrus_jms_correlationId", "${internal_correlation_id}");
         
-        receive("webServiceClient")
+        soap().client("webServiceClient")
+            .receive()
             .payload("<ns0:HelloResponse xmlns:ns0=\"http://www.consol.de/schemas/samples/sayHello.xsd\">" +
                             "<ns0:MessageId>${messageId}</ns0:MessageId>" +
                             "<ns0:CorrelationId>${correlationId}</ns0:CorrelationId>" +

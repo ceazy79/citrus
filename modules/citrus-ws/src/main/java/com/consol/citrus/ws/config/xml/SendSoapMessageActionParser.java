@@ -17,8 +17,11 @@
 package com.consol.citrus.ws.config.xml;
 
 import com.consol.citrus.config.xml.SendMessageActionParser;
+import com.consol.citrus.validation.builder.AbstractMessageContentBuilder;
+import com.consol.citrus.validation.context.ValidationContext;
 import com.consol.citrus.ws.actions.SendSoapMessageAction;
 import com.consol.citrus.ws.message.SoapAttachment;
+import com.consol.citrus.ws.message.SoapMessageHeaders;
 import org.springframework.beans.factory.support.BeanDefinitionBuilder;
 import org.springframework.beans.factory.xml.ParserContext;
 import org.springframework.util.xml.DomUtils;
@@ -51,6 +54,23 @@ public class SendSoapMessageActionParser extends SendMessageActionParser {
         }
 
         return builder;
+    }
+
+    @Override
+    protected void parseHeaderElements(Element actionElement, AbstractMessageContentBuilder messageBuilder, List<ValidationContext> validationContexts) {
+        super.parseHeaderElements(actionElement, messageBuilder, validationContexts);
+
+        if (actionElement.hasAttribute("soap-action")) {
+            messageBuilder.getMessageHeaders().put(SoapMessageHeaders.SOAP_ACTION, actionElement.getAttribute("soap-action"));
+        }
+
+        if (actionElement.hasAttribute("content-type")) {
+            messageBuilder.getMessageHeaders().put(SoapMessageHeaders.HTTP_CONTENT_TYPE, actionElement.getAttribute("content-type"));
+        }
+
+        if (actionElement.hasAttribute("accept")) {
+            messageBuilder.getMessageHeaders().put(SoapMessageHeaders.HTTP_ACCEPT, actionElement.getAttribute("accept"));
+        }
     }
 
     @Override

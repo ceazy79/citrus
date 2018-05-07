@@ -16,9 +16,10 @@
 
 package com.consol.citrus.validation.json;
 
-import com.consol.citrus.exceptions.CitrusRuntimeException;
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
+
+import java.util.*;
 
 /**
  * Custom JsonPath function support for size(), keySet() and toString() operations on Json objects and arrays.
@@ -28,49 +29,68 @@ import net.minidev.json.JSONObject;
  */
 public class JsonPathFunctions {
 
-    public static final String DEFAULT_FUNCTION = "toString";
-
-    public static final String[] FUNCTION_NAMES = {"keySet", "size", DEFAULT_FUNCTION};
+    private static final String[] FUNCTION_NAMES = {"keySet", "size", "values", "toString", "exists"};
 
     /**
-     * Evaluates function on result. Supported functions are size(), keySet() and toString().
+     * Evaluates function on result. Supported functions are size(), keySet(), values() and toString().
      * @param jsonPathResult
      * @param jsonPathFunction
      * @return
      */
-    public static String evaluate(Object jsonPathResult, String jsonPathFunction) {
-        if (jsonPathFunction.equals("size")) {
-            if (jsonPathResult instanceof JSONArray) {
-                return String.valueOf(((JSONArray) jsonPathResult).size());
-            } else if (jsonPathResult instanceof JSONObject) {
-                return String.valueOf(((JSONObject) jsonPathResult).size());
-            } else {
-                return "0";
-            }
-        } else if (jsonPathFunction.equals("keySet")) {
-            if (jsonPathResult instanceof JSONObject) {
-                StringBuilder keySetString = new StringBuilder();
-
-                for (String key :((JSONObject) jsonPathResult).keySet())  {
-                    keySetString.append(key + ",");
-                }
-
-                if (keySetString.length() > 0) {
-                    return String.format("[%s]", keySetString.toString().substring(0, keySetString.length() - 1));
+    public static Object evaluate(Object jsonPathResult, String jsonPathFunction) {
+        switch (jsonPathFunction) {
+            case "exists":
+                return jsonPathResult != null;
+            case "size":
+                if (jsonPathResult instanceof JSONArray) {
+                    return ((JSONArray) jsonPathResult).size();
+                } else if (jsonPathResult instanceof JSONObject) {
+                    return ((JSONObject) jsonPathResult).size();
                 } else {
-                    return "[]";
+                    return jsonPathResult != null ? 1 : 0;
                 }
-            } else {
-                return "[]";
-            }
-        } else if (jsonPathFunction.equals("toString")) {
-            if (jsonPathResult instanceof JSONArray) {
-                return ((JSONArray) jsonPathResult).toJSONString();
-            } else {
-                return jsonPathResult.toString();
-            }
+            case "keySet":
+                if (jsonPathResult instanceof JSONObject) {
+                    return ((JSONObject) jsonPathResult).keySet();
+                } else {
+                    return Collections.emptySet();
+                }
+            case "values":
+                if (jsonPathResult instanceof JSONObject) {
+                    Object[] valueObjects = ((JSONObject) jsonPathResult).values().toArray();
+                    List<String> values = new ArrayList<>(valueObjects.length);
+                    for (Object value : valueObjects) {
+                        if (value instanceof JSONObject) {
+                            values.add(((JSONObject) value).toJSONString());
+                        } else if (value instanceof JSONArray) {
+                            values.add(((JSONArray) value).toJSONString());
+                        } else {
+                            values.add(String.valueOf(value));
+                        }
+                    }
+
+                    return values.toString();
+                } else {
+                    return new Object[]{};
+                }
+            case "toString":
+                if (jsonPathResult instanceof JSONArray) {
+                    return ((JSONArray) jsonPathResult).toJSONString();
+                } else if (jsonPathResult instanceof JSONObject) {
+                    return ((JSONObject) jsonPathResult).toJSONString();
+                } else {
+                    return jsonPathResult.toString();
+                }
         }
 
-        throw new CitrusRuntimeException("Unsupported JsonPath function: " + jsonPathFunction);
+        return jsonPathResult;
+    }
+
+    /**
+     * Gets names of supported functions.
+     * @return
+     */
+    public static String[] getSupportedFunctions() {
+        return Arrays.copyOf(FUNCTION_NAMES, FUNCTION_NAMES.length);
     }
 }

@@ -16,17 +16,16 @@
 
 package com.consol.citrus.report;
 
-import com.consol.citrus.*;
+import com.consol.citrus.TestCase;
+import com.consol.citrus.TestCaseMetaInfo;
 import com.consol.citrus.exceptions.CitrusRuntimeException;
 import com.consol.citrus.util.FileUtils;
 import com.consol.citrus.util.PropertyUtils;
 import org.apache.commons.codec.binary.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.Resource;
 import org.springframework.util.StringUtils;
 
 import java.io.*;
@@ -38,96 +37,83 @@ import java.util.*;
  * 
  * @author Philipp Komninos, Christoph Deppisch
  */
-public class HtmlReporter extends AbstractTestListener implements TestReporter {
+public class HtmlReporter extends AbstractOutputFileReporter {
     
     /** Logger */
     private static Logger log = LoggerFactory.getLogger(HtmlReporter.class);
-    
-    /** Collect test results for test report */
-    private TestResults testResults = new TestResults();
     
     /** Map holding additional information of test cases */
     private Map<String, ResultDetail> details = new HashMap<String, ResultDetail>();
     
     /** Static resource for the HTML test report template */
-    private static final Resource REPORT_TEMPLATE = new ClassPathResource("test-report.html", HtmlReporter.class);
-    
+    @Value("${citrus.html.report.template:classpath:com/consol/citrus/report/test-report.html}")
+    private String reportTemplate = "classpath:com/consol/citrus/report/test-report.html";
+
     /** Test detail template */
-    private static final Resource TEST_DETAIL_TEMPLATE = new ClassPathResource("test-detail.html", HtmlReporter.class);
-    
+    @Value("${citrus.html.report.detail.template:classpath:com/consol/citrus/report/test-detail.html}")
+    private String testDetailTemplate = "classpath:com/consol/citrus/report/test-detail.html";
+
     /** Output directory */
-    private static final String OUTPUT_DIRECTORY = "test-output" + File.separator + "citrus-reports";
-    
-    /** Resulting HTML test report file name */    
-    private static final String REPORT_FILE_NAME = "citrus-test-results.html";
-    
+    @Value("${citrus.html.report.directory:}")
+    private String outputDirectory = "";
+
+    /** Resulting HTML test report file name */
+    @Value("${citrus.html.report.file:citrus-test-results.html}")
+    private String reportFileName = "citrus-test-results.html";
+
     /** Format for creation and update date of TestCases */
     private DateFormat dateFormat = DateFormat.getDateInstance(DateFormat.MEDIUM);
-    
-    /** Default logo image resource */
-    @Autowired(required = false)
-    @Qualifier("HtmlReporter.LOGO")
-    private Resource logo = new ClassPathResource("citrus_logo.png", HtmlReporter.class);
-    
-    /**
-     * @see com.consol.citrus.report.TestReporter#clearTestResults()
-     */
-    public void clearTestResults() {
-        testResults = new TestResults();
-    }
 
-    /**
-     * @see com.consol.citrus.report.TestReporter#generateTestResults()
-     */
-    public void generateTestResults() {
-        String report = "";
+    /** Default logo image resource */
+    @Value("${citrus.html.report.logo:classpath:com/consol/citrus/report/citrus_logo.png}")
+    private String logo = "classpath:com/consol/citrus/report/citrus_logo.png";
+
+    /** Enables/disables report generation */
+    @Value("${citrus.html.report.enabled:true}")
+    private String enabled = Boolean.TRUE.toString();
+    
+    @Override
+    public String getReportContent() {
         final StringBuilder reportDetails = new StringBuilder();
         
         log.debug("Generating HTML test report");
 
         try {
-            final String testDetails = FileUtils.readToString(TEST_DETAIL_TEMPLATE);
-            final String unknown = "N/A";
+            final String testDetails = FileUtils.readToString(FileUtils.getFileResource(testDetailTemplate));
+            final String emptyString = "";
 
-            testResults.doWithResults(new TestResults.ResultCallback() {
-                @Override
-                public void doWithResult(TestResult result) {
-                    ResultDetail detail = details.get(result.getTestName());
+            getTestResults().doWithResults(result -> {
+                ResultDetail detail = Optional.ofNullable(details.get(result.getTestName())).orElse(new ResultDetail());
 
-                    Properties detailProps = new Properties();
-                    detailProps.put("test.style.class", result.getResult().toLowerCase());
-                    detailProps.put("test.case.name", result.getTestName());
-                    detailProps.put("test.author", !StringUtils.hasText(detail.getMetaInfo().getAuthor()) ? unknown : detail.getMetaInfo().getAuthor());
-                    detailProps.put("test.status", detail.getMetaInfo().getStatus().toString());
-                    detailProps.put("test.creation.date", detail.getMetaInfo().getCreationDate() == null ? unknown : dateFormat.format(detail.getMetaInfo().getCreationDate()));
-                    detailProps.put("test.updater", !StringUtils.hasText(detail.getMetaInfo().getLastUpdatedBy()) ? unknown : detail.getMetaInfo().getLastUpdatedBy());
-                    detailProps.put("test.update.date", detail.getMetaInfo().getLastUpdatedOn() == null ? unknown : dateFormat.format(detail.getMetaInfo().getLastUpdatedOn()));
-                    detailProps.put("test.description", !StringUtils.hasText(detail.getDescription()) ? unknown : detail.getDescription());
-                    detailProps.put("test.result", result.getResult());
+                Properties detailProps = new Properties();
+                detailProps.put("test.style.class", result.getResult().toLowerCase());
+                detailProps.put("test.case.name", result.getTestName());
+                detailProps.put("test.author", !StringUtils.hasText(detail.getMetaInfo().getAuthor()) ? emptyString : detail.getMetaInfo().getAuthor());
+                detailProps.put("test.status", detail.getMetaInfo().getStatus().toString());
+                detailProps.put("test.creation.date", detail.getMetaInfo().getCreationDate() == null ? emptyString : dateFormat.format(detail.getMetaInfo().getCreationDate()));
+                detailProps.put("test.updater", !StringUtils.hasText(detail.getMetaInfo().getLastUpdatedBy()) ? emptyString : detail.getMetaInfo().getLastUpdatedBy());
+                detailProps.put("test.update.date", detail.getMetaInfo().getLastUpdatedOn() == null ? emptyString : dateFormat.format(detail.getMetaInfo().getLastUpdatedOn()));
+                detailProps.put("test.description", !StringUtils.hasText(detail.getDescription()) ? emptyString : detail.getDescription());
+                detailProps.put("test.result", result.getResult());
 
-                    reportDetails.append(PropertyUtils.replacePropertiesInString(testDetails, detailProps));
+                reportDetails.append(PropertyUtils.replacePropertiesInString(testDetails, detailProps));
 
-                    if (result.isFailed() && result.getCause() != null) {
-                        reportDetails.append(getStackTraceHtml(result.getCause()));
-                    }
+                if (result.isFailed() && result.getCause() != null) {
+                    reportDetails.append(getStackTraceHtml(result.getCause()));
                 }
             });
 
             Properties reportProps = new Properties();
-            reportProps.put("test.cnt", Integer.toString(testResults.getSize()));
-            reportProps.put("skipped.test.cnt", Integer.toString(testResults.getSkipped()));
-            reportProps.put("skipped.test.pct", testResults.getSkippedPercentage());
-            reportProps.put("failed.test.cnt", Integer.toString(testResults.getFailed()));
-            reportProps.put("failed.test.pct", testResults.getFailedPercentage());
-            reportProps.put("success.test.cnt", Integer.toString(testResults.getSuccess()));
-            reportProps.put("success.test.pct", testResults.getSuccessPercentage());
+            reportProps.put("test.cnt", Integer.toString(getTestResults().getSize()));
+            reportProps.put("skipped.test.cnt", Integer.toString(getTestResults().getSkipped()));
+            reportProps.put("skipped.test.pct", getTestResults().getSkippedPercentage());
+            reportProps.put("failed.test.cnt", Integer.toString(getTestResults().getFailed()));
+            reportProps.put("failed.test.pct", getTestResults().getFailedPercentage());
+            reportProps.put("success.test.cnt", Integer.toString(getTestResults().getSuccess()));
+            reportProps.put("success.test.pct", getTestResults().getSuccessPercentage());
             reportProps.put("test.results", reportDetails.toString());
             reportProps.put("logo.data", getLogoImageData());
-            report = PropertyUtils.replacePropertiesInString(FileUtils.readToString(REPORT_TEMPLATE), reportProps);
-
-            createReportFile(report);
-
-            log.info("Generated HTML test report");
+            return PropertyUtils.replacePropertiesInString(FileUtils.readToString(FileUtils.getFileResource(reportTemplate)), reportProps);
         } catch (IOException e) {
             throw new CitrusRuntimeException("Failed to generate HTML test report", e);
         }
@@ -143,10 +129,10 @@ public class HtmlReporter extends AbstractTestListener implements TestReporter {
         BufferedInputStream reader = null;
         
         try {
-            reader = new BufferedInputStream(logo.getInputStream());
+            reader = new BufferedInputStream(FileUtils.getFileResource(logo).getInputStream());
             
             byte[] contents = new byte[1024];
-            while( reader.read(contents) != -1){
+            while( reader.read(contents) != -1) {
                 os.write(contents);
             }
         } catch(IOException e) {
@@ -244,7 +230,10 @@ public class HtmlReporter extends AbstractTestListener implements TestReporter {
      */
     private String getStackTraceHtml(Throwable cause) {
         StringBuilder stackTraceBuilder = new StringBuilder();
-        stackTraceBuilder.append(cause.getClass().getName() + ": " + cause.getMessage() + "\n ");
+        stackTraceBuilder.append(cause.getClass().getName())
+                        .append(": ")
+                        .append(cause.getMessage())
+                        .append("\n ");
         for (int i = 0; i < cause.getStackTrace().length; i++) {
             stackTraceBuilder.append("\n\t at ");
             stackTraceBuilder.append(cause.getStackTrace()[i]);
@@ -255,73 +244,117 @@ public class HtmlReporter extends AbstractTestListener implements TestReporter {
         		"</pre>" + getCodeSnippetHtml(cause) + "</div></td></tr>";
     }
 
-    /**
-     * Creates the HTML report file
-     * @param content The String content of the report file
-     */
-    private void createReportFile(String content) {
-        Writer fileWriter = null;
-        
-        File targetDirectory = new File(OUTPUT_DIRECTORY);
-        if (!targetDirectory.exists()) {
-            boolean success = targetDirectory.mkdirs();
-            
-            if (!success) {
-                throw new CitrusRuntimeException("Unable to create folder structure for HTML report");
-            }
-        }
-        
-        try {
-            fileWriter = new FileWriter(OUTPUT_DIRECTORY + File.separator + REPORT_FILE_NAME);
-            fileWriter.append(content);
-            fileWriter.flush();
-        } catch (IOException e) {
-            log.error("Failed to save HTML test report", e);
-        } finally {
-            if (fileWriter != null) {
-                try { 
-                    fileWriter.close(); 
-                } catch (IOException e) { 
-                    log.error("Error closing HTML report file", e); 
-                } 
-            }
-        }
-    }
-
     @Override
     public void onTestSuccess(TestCase test) {
         details.put(test.getName(), ResultDetail.build(test));
-        
-        testResults.addResult(TestResult.success(test.getName(), test.getParameters()));
+        super.onTestSuccess(test);
     }
     
     @Override
     public void onTestFailure(TestCase test, Throwable cause) {
         details.put(test.getName(), ResultDetail.build(test));
-        testResults.addResult(TestResult.failed(test.getName(), cause, test.getParameters()));
+        super.onTestFailure(test, cause);
     }
     
     @Override
     public void onTestSkipped(TestCase test) {
         details.put(test.getName(), ResultDetail.build(test));
-        
-        testResults.addResult(TestResult.skipped(test.getName(), test.getParameters()));
+        super.onTestSkipped(test);
     }
-    
+
     /**
      * Sets the logo.
      * @param logo the logo to set
      */
-    public void setLogo(Resource logo) {
+    public void setLogo(String logo) {
         this.logo = logo;
     }
-    
+
+    /**
+     * Sets the outputDirectory property.
+     *
+     * @param outputDirectory
+     * @deprecated in favor of using {@link AbstractTestReporter#setReportDirectory}.
+     */
+    @Deprecated
+    public void setOutputDirectory(String outputDirectory) {
+        setReportDirectory(outputDirectory);
+    }
+
+    @Override
+    public String getReportDirectory() {
+        if (StringUtils.hasText(outputDirectory)) {
+            return outputDirectory;
+        }
+
+        return super.getReportDirectory();
+    }
+
+    /**
+     * Sets the reportFileName property.
+     *
+     * @param reportFileName
+     */
+    public void setReportFileName(String reportFileName) {
+        this.reportFileName = reportFileName;
+    }
+
+    /**
+     * Gets the reportFileName.
+     *
+     * @return
+     */
+    @Override
+    public String getReportFileName() {
+        return reportFileName;
+    }
+
+    /**
+     * Sets the dateFormat property.
+     *
+     * @param dateFormat
+     */
+    public void setDateFormat(DateFormat dateFormat) {
+        this.dateFormat = dateFormat;
+    }
+
+    /**
+     * Sets the reportTemplate property.
+     *
+     * @param reportTemplate
+     */
+    public void setReportTemplate(String reportTemplate) {
+        this.reportTemplate = reportTemplate;
+    }
+
+    /**
+     * Sets the testDetailTemplate property.
+     *
+     * @param testDetailTemplate
+     */
+    public void setTestDetailTemplate(String testDetailTemplate) {
+        this.testDetailTemplate = testDetailTemplate;
+    }
+
+    /**
+     * Sets the enabled property.
+     * @param enabled
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = String.valueOf(enabled);
+    }
+
+    @Override
+    protected boolean isEnabled() {
+        return StringUtils.hasText(enabled) && enabled.equalsIgnoreCase(Boolean.TRUE.toString());
+    }
+
     /**
      * Value object holding test specific data for HTML report generation. 
      */
     private static class ResultDetail {
         /** The meta info of the underlying test */
-        private TestCaseMetaInfo metaInfo;
+        private TestCaseMetaInfo metaInfo = new TestCaseMetaInfo();
         
         /** Description of the test */
         private String description;

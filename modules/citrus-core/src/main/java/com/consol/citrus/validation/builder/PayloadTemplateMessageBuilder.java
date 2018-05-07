@@ -16,11 +16,18 @@
 
 package com.consol.citrus.validation.builder;
 
+import com.consol.citrus.Citrus;
 import com.consol.citrus.context.TestContext;
 import com.consol.citrus.exceptions.CitrusRuntimeException;
+import com.consol.citrus.message.MessageType;
 import com.consol.citrus.util.FileUtils;
+import org.springframework.util.FileCopyUtils;
+import org.springframework.util.StreamUtils;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.Charset;
+import java.util.zip.GZIPOutputStream;
 
 /**
  * @author Christoph Deppisch
@@ -30,23 +37,48 @@ public class PayloadTemplateMessageBuilder extends AbstractMessageContentBuilder
     /** Message payload defined in external file resource path */
     private String payloadResourcePath;
 
+    /** Charset applied to payload resource */
+    private String payloadResourceCharset = Citrus.CITRUS_FILE_ENCODING;
+
     /** Direct string representation of message payload */
     private String payloadData;
     
     /**
-     * Build the control message from
+     * Build the control message from payload file resource or String data.
      */
-    public String buildMessagePayload(TestContext context) {
+    public Object buildMessagePayload(TestContext context, String messageType) {
         try {
-            //construct control message payload
-            String messagePayload = "";
             if (payloadResourcePath != null) {
-                messagePayload = context.replaceDynamicContentInString(FileUtils.readToString(FileUtils.getFileResource(payloadResourcePath, context)));
-            } else if (payloadData != null){
-                messagePayload = context.replaceDynamicContentInString(payloadData);
+                if (messageType.equalsIgnoreCase(MessageType.BINARY.name())) {
+                    return FileCopyUtils.copyToByteArray(FileUtils.getFileResource(payloadResourcePath, context).getInputStream());
+                } else if (messageType.equalsIgnoreCase(MessageType.GZIP.name())) {
+                    try (ByteArrayOutputStream zipped = new ByteArrayOutputStream();
+                         GZIPOutputStream gzipOutputStream = new GZIPOutputStream(zipped)) {
+                        StreamUtils.copy(FileCopyUtils.copyToByteArray(FileUtils.getFileResource(payloadResourcePath, context).getInputStream()), gzipOutputStream);
+
+                        gzipOutputStream.close();
+                        return zipped.toByteArray();
+                    }
+                } else {
+                    return context.replaceDynamicContentInString(FileUtils.readToString(FileUtils.getFileResource(payloadResourcePath, context), Charset.forName(context.resolveDynamicValue(payloadResourceCharset))));
+                }
+            } else if (payloadData != null) {
+                if (messageType.equalsIgnoreCase(MessageType.BINARY.name())) {
+                    return context.replaceDynamicContentInString(payloadData).getBytes();
+                } else if (messageType.equalsIgnoreCase(MessageType.GZIP.name())) {
+                    try (ByteArrayOutputStream zipped = new ByteArrayOutputStream();
+                         GZIPOutputStream gzipOutputStream = new GZIPOutputStream(zipped)) {
+                        StreamUtils.copy(context.replaceDynamicContentInString(payloadData).getBytes(), gzipOutputStream);
+
+                        gzipOutputStream.close();
+                        return zipped.toByteArray();
+                    }
+                } else {
+                    return context.replaceDynamicContentInString(payloadData);
+                }
             }
 
-            return messagePayload;
+            return "";
         } catch (IOException e) {
             throw new CitrusRuntimeException("Failed to build control message payload", e);
         }
@@ -82,5 +114,23 @@ public class PayloadTemplateMessageBuilder extends AbstractMessageContentBuilder
      */
     public String getPayloadData() {
         return payloadData;
+    }
+
+    /**
+     * Gets the payloadResourceCharset.
+     *
+     * @return
+     */
+    public String getPayloadResourceCharset() {
+        return payloadResourceCharset;
+    }
+
+    /**
+     * Sets the payloadResourceCharset.
+     *
+     * @param payloadResourceCharset
+     */
+    public void setPayloadResourceCharset(String payloadResourceCharset) {
+        this.payloadResourceCharset = payloadResourceCharset;
     }
 }

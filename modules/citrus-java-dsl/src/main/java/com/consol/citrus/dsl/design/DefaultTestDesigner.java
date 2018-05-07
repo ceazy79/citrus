@@ -20,28 +20,18 @@ import com.consol.citrus.*;
 import com.consol.citrus.actions.*;
 import com.consol.citrus.container.*;
 import com.consol.citrus.context.TestContext;
-import com.consol.citrus.dsl.actions.DelegatingTestAction;
 import com.consol.citrus.dsl.builder.*;
-import com.consol.citrus.dsl.util.PositionHandle;
+import com.consol.citrus.dsl.container.FinallySequence;
 import com.consol.citrus.endpoint.Endpoint;
 import com.consol.citrus.exceptions.CitrusRuntimeException;
-import com.consol.citrus.jms.actions.PurgeJmsQueuesAction;
 import com.consol.citrus.message.MessageType;
 import com.consol.citrus.report.TestActionListeners;
-import com.consol.citrus.script.GroovyAction;
 import com.consol.citrus.server.Server;
-import com.consol.citrus.util.FileUtils;
-import com.consol.citrus.ws.actions.*;
-import com.consol.citrus.ws.client.WebServiceClient;
-import com.consol.citrus.ws.server.WebServiceServer;
-import com.consol.citrus.ws.validation.SoapFaultValidator;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.io.Resource;
 import org.springframework.util.CollectionUtils;
 
-import javax.jms.ConnectionFactory;
 import javax.sql.DataSource;
-import java.io.IOException;
 import java.util.*;
 
 /**
@@ -54,7 +44,7 @@ import java.util.*;
 public class DefaultTestDesigner implements TestDesigner {
 
     /** This builders test case */
-    private final TestCase testCase = new TestCase();
+    private final TestCase testCase;
 
     /** This runners test context */
     private TestContext context;
@@ -65,12 +55,25 @@ public class DefaultTestDesigner implements TestDesigner {
     /** Spring bean application context */
     private ApplicationContext applicationContext;
 
+    /** Optional stack of containers cached for execution */
+    private Stack<AbstractActionContainer> containers = new Stack<>();
+
     /** Default constructor */
     public DefaultTestDesigner() {
+        this(new TestCase());
         testCase.setVariableDefinitions(variables);
 
+        testClass(this.getClass());
         name(this.getClass().getSimpleName());
         packageName(this.getClass().getPackage().getName());
+    }
+
+    /**
+     * Constructor initializing test case.
+     * @param testCase
+     */
+    protected DefaultTestDesigner(TestCase testCase) {
+        this.testCase = testCase;
     }
 
     /**
@@ -103,6 +106,11 @@ public class DefaultTestDesigner implements TestDesigner {
         if (!applicationContext.getBeansOfType(SequenceAfterTest.class).isEmpty()) {
             testCase.setAfterTest(CollectionUtils.arrayToList(applicationContext.getBeansOfType(SequenceAfterTest.class).values().toArray()));
         }
+    }
+
+    @Override
+    public void testClass(Class<?> type) {
+        getTestCase().setTestClass(type);
     }
 
     @Override
@@ -142,20 +150,6 @@ public class DefaultTestDesigner implements TestDesigner {
     }
 
     @Override
-    public CreateVariablesAction createVariable(String variableName, String value) {
-        CreateVariablesAction action = new CreateVariablesAction();
-        action.getVariables().put(variableName, value);
-        action(action);
-        return action;
-    }
-
-    @Override
-    public void applyBehavior(TestBehavior behavior) {
-        behavior.setApplicationContext(getApplicationContext());
-        behavior.apply(this);
-    }
-
-    @Override
     public void action(TestAction testAction) {
         List<TestAction> actions = null;
         if (testAction instanceof TestActionContainerBuilder) {
@@ -165,33 +159,54 @@ public class DefaultTestDesigner implements TestDesigner {
         }
 
         if (!CollectionUtils.isEmpty(actions)) {
-            for (TestAction action : actions) {
-                if (action instanceof TestActionBuilder<?>) {
-                    testCase.getActions().remove(((TestActionBuilder<?>) action).build());
-                } else if (!action.getClass().isAnonymousClass()) {
-                    if (!testCase.getActions().remove(action)) {
-                        TestAction toBeRemoved = null;
-                        for (TestAction testCaseAction : testCase.getActions()) {
-                            if (testCaseAction instanceof DelegatingTestAction &&
-                                    ((DelegatingTestAction) testCaseAction).getDelegate().equals(action)) {
-                                toBeRemoved = testCaseAction;
-                                break;
-                            }
-                        }
+            if (containers.lastElement().equals(testAction)) {
+                containers.pop();
+            } else {
+                throw new CitrusRuntimeException("Invalid use of action containers - the container execution is not expected!");
+            }
 
-                        if (toBeRemoved != null) {
-                            testCase.getActions().remove(toBeRemoved);
-                        }
-                    }
-                }
+            if (testAction instanceof FinallySequence) {
+                testCase.getFinalActions().addAll(((FinallySequence) testAction).getActions());
+                return;
             }
         }
 
         if (testAction instanceof TestActionBuilder<?>) {
-            testCase.addTestAction(((TestActionBuilder<?>) testAction).build());
+            if (!containers.isEmpty()) {
+                containers.lastElement().addTestAction(((TestActionBuilder<?>) testAction).build());
+            } else {
+                testCase.addTestAction(((TestActionBuilder<?>) testAction).build());
+            }
         } else {
-            testCase.addTestAction(testAction);
+            if (!containers.isEmpty()) {
+                containers.lastElement().addTestAction(testAction);
+            } else {
+                testCase.addTestAction(testAction);
+            }
         }
+    }
+
+    @Override
+    public ApplyTestBehaviorAction applyBehavior(TestBehavior behavior) {
+        ApplyTestBehaviorAction action = new ApplyTestBehaviorAction(this, behavior);
+        behavior.setApplicationContext(getApplicationContext());
+        action.execute(null);
+        return action;
+    }
+
+    @Override
+    public <T extends AbstractActionContainer> AbstractTestContainerBuilder<T> container(T container) {
+        AbstractTestContainerBuilder<T> containerBuilder = new AbstractTestContainerBuilder<T>(this, container) {};
+        this.containers.push(containerBuilder.build());
+        return containerBuilder;
+    }
+
+    @Override
+    public CreateVariablesAction createVariable(String variableName, String value) {
+        CreateVariablesAction action = new CreateVariablesAction();
+        action.getVariables().put(variableName, value);
+        action(action);
+        return action;
     }
 
     @Override
@@ -307,19 +322,9 @@ public class DefaultTestDesigner implements TestDesigner {
     }
 
     @Override
-    public PurgeJmsQueuesBuilder purgeQueues(ConnectionFactory connectionFactory) {
-        PurgeJmsQueuesAction action = new PurgeJmsQueuesAction();
-        action.setConnectionFactory(connectionFactory);
-        PurgeJmsQueuesBuilder builder = new PurgeJmsQueuesBuilder(action);
-        action(builder);
-        return builder;
-    }
-
-    @Override
     public PurgeJmsQueuesBuilder purgeQueues() {
-        PurgeJmsQueuesAction action = new PurgeJmsQueuesAction();
-        action.setConnectionFactory(getApplicationContext().getBean("connectionFactory", ConnectionFactory.class));
-        PurgeJmsQueuesBuilder builder = new PurgeJmsQueuesBuilder(action);
+        PurgeJmsQueuesBuilder builder = new PurgeJmsQueuesBuilder()
+                .withApplicationContext(applicationContext);
         action(builder);
         return builder;
     }
@@ -334,18 +339,7 @@ public class DefaultTestDesigner implements TestDesigner {
 
     @Override
     public PurgeEndpointsBuilder purgeEndpoints() {
-        PurgeEndpointsBuilder builder = new PurgeEndpointsBuilder();
-        builder.withApplicationContext(getApplicationContext());
-        action(builder);
-        return builder;
-    }
-
-    @Override
-    public ReceiveSoapMessageBuilder receive(WebServiceServer server) {
-        ReceiveSoapMessageAction action = new ReceiveSoapMessageAction();
-        action.setEndpoint(server);
-        ReceiveSoapMessageBuilder builder = new ReceiveSoapMessageBuilder(action)
-                .messageType(MessageType.XML)
+        PurgeEndpointsBuilder builder = new PurgeEndpointsBuilder()
                 .withApplicationContext(getApplicationContext());
         action(builder);
         return builder;
@@ -360,7 +354,6 @@ public class DefaultTestDesigner implements TestDesigner {
                 .withApplicationContext(getApplicationContext());
         action(builder);
 
-        builder.position(positionHandle());
         return builder;
     }
 
@@ -373,17 +366,6 @@ public class DefaultTestDesigner implements TestDesigner {
                 .withApplicationContext(getApplicationContext());
         action(builder);
 
-        builder.position(positionHandle());
-        return builder;
-    }
-
-    @Override
-    public SendSoapMessageBuilder send(WebServiceClient client) {
-        SendSoapMessageAction action = new SendSoapMessageAction();
-        action.setEndpoint(client);
-        SendSoapMessageBuilder builder = new SendSoapMessageBuilder(action)
-                .withApplicationContext(getApplicationContext());
-        action(builder);
         return builder;
     }
 
@@ -395,7 +377,6 @@ public class DefaultTestDesigner implements TestDesigner {
                 .withApplicationContext(getApplicationContext());
         action(builder);
 
-        builder.position(positionHandle());
         return builder;
     }
 
@@ -407,28 +388,6 @@ public class DefaultTestDesigner implements TestDesigner {
                 .withApplicationContext(getApplicationContext());
         action(builder);
 
-        builder.position(positionHandle());
-        return builder;
-    }
-
-    @Override
-    public SendSoapFaultBuilder sendSoapFault(String messageEndpointUri) {
-        SendSoapFaultAction action = new SendSoapFaultAction();
-        action.setEndpointUri(messageEndpointUri);
-        SendSoapFaultBuilder builder = new SendSoapFaultBuilder(action)
-                .withApplicationContext(getApplicationContext());
-        action(builder);
-        return builder;
-    }
-
-    @Override
-    public SendSoapFaultBuilder sendSoapFault(Endpoint messageEndpoint) {
-        SendSoapFaultAction action = new SendSoapFaultAction();
-        action.setEndpoint(messageEndpoint);
-        SendSoapFaultBuilder builder = new SendSoapFaultBuilder(action)
-                .withApplicationContext(getApplicationContext());
-
-        action(builder);
         return builder;
     }
 
@@ -511,6 +470,15 @@ public class DefaultTestDesigner implements TestDesigner {
     }
 
     @Override
+    public StopTimeAction stopTime(String id, String suffix) {
+        StopTimeAction action = new StopTimeAction();
+        action.setId(id);
+        action.setSuffix(suffix);
+        action(action);
+        return action;
+    }
+
+    @Override
     public TraceVariablesAction traceVariables() {
         TraceVariablesAction action = new TraceVariablesAction();
         action(action);
@@ -527,22 +495,16 @@ public class DefaultTestDesigner implements TestDesigner {
 
     @Override
     public GroovyActionBuilder groovy(String script) {
-        GroovyAction action = new GroovyAction();
-        action.setScript(script);
-        GroovyActionBuilder builder = new GroovyActionBuilder(action);
+        GroovyActionBuilder builder = new GroovyActionBuilder()
+                .script(script);
         action(builder);
         return builder;
     }
 
     @Override
     public GroovyActionBuilder groovy(Resource scriptResource) {
-        GroovyAction action = new GroovyAction();
-        try {
-            action.setScript(FileUtils.readToString(scriptResource));
-        } catch (IOException e) {
-            throw new CitrusRuntimeException("Failed to read script resource", e);
-        }
-        GroovyActionBuilder builder = new GroovyActionBuilder(action);
+        GroovyActionBuilder builder = new GroovyActionBuilder()
+                .script(scriptResource);
         action(builder);
         return builder;
     }
@@ -555,23 +517,9 @@ public class DefaultTestDesigner implements TestDesigner {
     }
 
     @Override
-    public AssertExceptionBuilder assertException(TestAction testAction) {
-        AssertExceptionBuilder builder = new AssertExceptionBuilder(this);
-        builder.actions(testAction);
-        return builder;
-    }
-
-    @Override
     public AssertExceptionBuilder assertException() {
         AssertExceptionBuilder builder = new AssertExceptionBuilder(this);
-        return builder;
-    }
-
-    @Override
-    public CatchExceptionBuilder catchException(TestAction... actions) {
-        CatchExceptionBuilder builder = new CatchExceptionBuilder(this)
-                .exception(CitrusRuntimeException.class.getName());
-        builder.actions(actions);
+        containers.push(builder.build());
         return builder;
     }
 
@@ -579,117 +527,72 @@ public class DefaultTestDesigner implements TestDesigner {
     public CatchExceptionBuilder catchException() {
         CatchExceptionBuilder builder = new CatchExceptionBuilder(this)
                 .exception(CitrusRuntimeException.class.getName());
-        return builder;
-    }
-
-    @Override
-    public AssertSoapFaultBuilder assertSoapFault(TestAction testAction) {
-        AssertSoapFaultBuilder builder = new AssertSoapFaultBuilder(this);
-        builder.actions(testAction);
-
-        if (getApplicationContext().containsBean("soapFaultValidator")) {
-            builder.validator(getApplicationContext().getBean("soapFaultValidator", SoapFaultValidator.class));
-        }
+        containers.push(builder.build());
         return builder;
     }
 
     @Override
     public AssertSoapFaultBuilder assertSoapFault() {
-        AssertSoapFaultBuilder builder = new AssertSoapFaultBuilder(this);
-        if (getApplicationContext().containsBean("soapFaultValidator")) {
-            builder.validator(getApplicationContext().getBean("soapFaultValidator", SoapFaultValidator.class));
-        }
-        return builder;
-    }
+        AssertSoapFaultBuilder builder = new AssertSoapFaultBuilder(this)
+                .withApplicationContext(applicationContext);
+        containers.push(builder.build());
 
-    @Override
-    public ConditionalBuilder conditional(TestAction... actions) {
-        ConditionalBuilder builder = new ConditionalBuilder(this);
-        builder.actions(actions);
         return builder;
     }
 
     @Override
     public ConditionalBuilder conditional() {
         ConditionalBuilder builder = new ConditionalBuilder(this);
-        return builder;
-    }
-
-    @Override
-    public IterateBuilder iterate(TestAction... actions) {
-        IterateBuilder builder = new IterateBuilder(this);
-        builder.actions(actions);
+        containers.push(builder.build());
         return builder;
     }
 
     @Override
     public IterateBuilder iterate() {
         IterateBuilder builder = new IterateBuilder(this);
-        return builder;
-    }
-
-    @Override
-    public ParallelBuilder parallel(TestAction... actions) {
-        ParallelBuilder builder = new ParallelBuilder(this);
-        builder.actions(actions);
+        containers.push(builder.build());
         return builder;
     }
 
     @Override
     public ParallelBuilder parallel() {
         ParallelBuilder builder = new ParallelBuilder(this);
-        return builder;
-    }
-
-    @Override
-    public RepeatOnErrorBuilder repeatOnError(TestAction... actions) {
-        RepeatOnErrorBuilder builder = new RepeatOnErrorBuilder(this);
-        builder.actions(actions);
+        containers.push(builder.build());
         return builder;
     }
 
     @Override
     public RepeatOnErrorBuilder repeatOnError() {
         RepeatOnErrorBuilder builder = new RepeatOnErrorBuilder(this);
-        return builder;
-    }
-
-    @Override
-    public RepeatBuilder repeat(TestAction... actions) {
-        RepeatBuilder builder = new RepeatBuilder(this);
-        builder.actions(actions);
+        containers.push(builder.build());
         return builder;
     }
 
     @Override
     public RepeatBuilder repeat() {
         RepeatBuilder builder = new RepeatBuilder(this);
-        return builder;
-    }
-
-    @Override
-    public SequenceBuilder sequential(TestAction... actions) {
-        SequenceBuilder builder = new SequenceBuilder(this);
-        builder.actions(actions);
+        containers.push(builder.build());
         return builder;
     }
 
     @Override
     public SequenceBuilder sequential() {
         SequenceBuilder builder = new SequenceBuilder(this);
+        containers.push(builder.build());
+        return builder;
+    }
+
+    @Override
+    public AsyncBuilder async() {
+        AsyncBuilder builder = new AsyncBuilder(this);
+        containers.push(builder.build());
         return builder;
     }
 
     @Override
     public TimerBuilder timer() {
         TimerBuilder builder = new TimerBuilder(this);
-        return builder;
-    }
-
-    @Override
-    public TimerBuilder timer(TestAction... actions) {
-        TimerBuilder builder = new TimerBuilder(this);
-        builder.actions(actions);
+        containers.push(builder.build());
         return builder;
     }
 
@@ -716,6 +619,20 @@ public class DefaultTestDesigner implements TestDesigner {
     }
 
     @Override
+    public KubernetesActionBuilder kubernetes() {
+        KubernetesActionBuilder builder = new KubernetesActionBuilder();
+        action(builder);
+        return builder;
+    }
+
+    @Override
+    public SeleniumActionBuilder selenium() {
+        SeleniumActionBuilder builder = new SeleniumActionBuilder();
+        action(builder);
+        return builder;
+    }
+
+    @Override
     public HttpActionBuilder http() {
         HttpActionBuilder builder = new HttpActionBuilder()
                 .withApplicationContext(getApplicationContext());
@@ -724,8 +641,24 @@ public class DefaultTestDesigner implements TestDesigner {
     }
 
     @Override
+    public SoapActionBuilder soap() {
+        SoapActionBuilder builder = new SoapActionBuilder()
+                .withApplicationContext(getApplicationContext());
+        action(builder);
+        return builder;
+    }
+
+    @Override
     public CamelRouteActionBuilder camel() {
         CamelRouteActionBuilder builder = new CamelRouteActionBuilder()
+                .withApplicationContext(getApplicationContext());
+        action(builder);
+        return builder;
+    }
+
+    @Override
+    public ZooActionBuilder zookeeper() {
+        ZooActionBuilder builder = new ZooActionBuilder()
                 .withApplicationContext(getApplicationContext());
         action(builder);
         return builder;
@@ -742,21 +675,10 @@ public class DefaultTestDesigner implements TestDesigner {
     }
 
     @Override
-    public FinallySequenceBuilder doFinally(TestAction... actions) {
-        FinallySequenceBuilder builder = new FinallySequenceBuilder(this);
-        builder.actions(actions);
-        return builder;
-    }
-
-    @Override
     public FinallySequenceBuilder doFinally() {
         FinallySequenceBuilder builder = new FinallySequenceBuilder(this);
+        containers.push(builder.build());
         return builder;
-    }
-
-    @Override
-    public PositionHandle positionHandle() {
-        return new PositionHandle(testCase.getActions());
     }
 
     /**
@@ -799,4 +721,11 @@ public class DefaultTestDesigner implements TestDesigner {
         return context;
     }
 
+    /**
+     * Sets the test context.
+     * @param context
+     */
+    public void setTestContext(TestContext context) {
+        this.context = context;
+    }
 }

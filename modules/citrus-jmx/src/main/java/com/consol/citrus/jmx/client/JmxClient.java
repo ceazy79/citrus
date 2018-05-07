@@ -78,7 +78,7 @@ public class JmxClient extends AbstractEndpoint implements Producer, ReplyConsum
     public JmxClient(JmxEndpointConfiguration endpointConfiguration) {
         super(endpointConfiguration);
 
-        this.correlationManager = new PollingCorrelationManager(endpointConfiguration, "Reply message did not arrive yet");
+        this.correlationManager = new PollingCorrelationManager<>(endpointConfiguration, "Reply message did not arrive yet");
     }
 
     @Override
@@ -105,7 +105,7 @@ public class JmxClient extends AbstractEndpoint implements Producer, ReplyConsum
         }
         context.onOutboundMessage(message);
 
-        ManagedBeanInvocation invocation = getEndpointConfiguration().getMessageConverter().convertOutbound(message, getEndpointConfiguration());
+        ManagedBeanInvocation invocation = getEndpointConfiguration().getMessageConverter().convertOutbound(message, getEndpointConfiguration(), context);
         try {
             if (StringUtils.hasText(invocation.getMbean())) {
                 objectName = new ObjectName(invocation.getMbean().toString());

@@ -19,11 +19,13 @@ package com.consol.citrus.dsl.design;
 import com.consol.citrus.TestCase;
 import com.consol.citrus.container.SequenceAfterTest;
 import com.consol.citrus.container.SequenceBeforeTest;
+import com.consol.citrus.dsl.actions.DelegatingTestAction;
 import com.consol.citrus.endpoint.Endpoint;
 import com.consol.citrus.report.TestActionListeners;
 import com.consol.citrus.testng.AbstractTestNGUnitTest;
-import com.consol.citrus.validation.builder.PayloadTemplateMessageBuilder;
+import com.consol.citrus.validation.builder.StaticMessageContentBuilder;
 import com.consol.citrus.ws.actions.SendSoapFaultAction;
+import com.consol.citrus.ws.server.WebServiceServer;
 import org.mockito.Mockito;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.io.Resource;
@@ -34,7 +36,8 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.HashMap;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.when;
 
 
 /**
@@ -45,7 +48,7 @@ public class SendSoapFaultTestDesignerTest extends AbstractTestNGUnitTest {
     public static final String FAULT_STRING = "Something went wrong";
     public static final String FAULT_CODE = "CITRUS-1000";
 
-    private Endpoint soapEndpoint = Mockito.mock(Endpoint.class);
+    private WebServiceServer soapServer = Mockito.mock(WebServiceServer.class);
     private ApplicationContext applicationContextMock = Mockito.mock(ApplicationContext.class);
     private Resource resource = Mockito.mock(Resource.class);
 
@@ -54,7 +57,8 @@ public class SendSoapFaultTestDesignerTest extends AbstractTestNGUnitTest {
         MockTestDesigner builder = new MockTestDesigner(applicationContext, context) {
             @Override
             public void configure() {
-                sendSoapFault(soapEndpoint)
+                soap().server(soapServer)
+                        .sendFault()
                         .faultActor("faultActor")
                         .faultCode(FAULT_CODE)
                         .faultString(FAULT_STRING);
@@ -65,16 +69,17 @@ public class SendSoapFaultTestDesignerTest extends AbstractTestNGUnitTest {
 
         TestCase test = builder.getTestCase();
         Assert.assertEquals(test.getActionCount(), 1);
-        Assert.assertEquals(test.getActions().get(0).getClass(), SendSoapFaultAction.class);
+        Assert.assertEquals(test.getActions().get(0).getClass(), DelegatingTestAction.class);
+        Assert.assertEquals(((DelegatingTestAction)test.getActions().get(0)).getDelegate().getClass(), SendSoapFaultAction.class);
 
-        SendSoapFaultAction action = ((SendSoapFaultAction)test.getActions().get(0));
+        SendSoapFaultAction action = (SendSoapFaultAction) ((DelegatingTestAction)test.getActions().get(0)).getDelegate();
         Assert.assertEquals(action.getName(), "send");
 
-        Assert.assertEquals(action.getEndpoint(), soapEndpoint);
-        Assert.assertEquals(action.getMessageBuilder().getClass(), PayloadTemplateMessageBuilder.class);
+        Assert.assertEquals(action.getEndpoint(), soapServer);
+        Assert.assertEquals(action.getMessageBuilder().getClass(), StaticMessageContentBuilder.class);
 
-        PayloadTemplateMessageBuilder messageBuilder = (PayloadTemplateMessageBuilder) action.getMessageBuilder();
-        Assert.assertNull(messageBuilder.getPayloadData());
+        StaticMessageContentBuilder messageBuilder = (StaticMessageContentBuilder) action.getMessageBuilder();
+        Assert.assertEquals(messageBuilder.getMessage().getPayload(), "");
         Assert.assertEquals(messageBuilder.getMessageHeaders().size(), 0L);
         Assert.assertEquals(action.getFaultActor(), "faultActor");
         Assert.assertEquals(action.getFaultCode(), FAULT_CODE);
@@ -85,12 +90,14 @@ public class SendSoapFaultTestDesignerTest extends AbstractTestNGUnitTest {
     public void testSendSoapFaultByEndpointName() {
         reset(applicationContextMock);
         when(applicationContextMock.getBean(TestActionListeners.class)).thenReturn(new TestActionListeners());
+        when(applicationContextMock.getBean("soapServer", Endpoint.class)).thenReturn(soapServer);
         when(applicationContextMock.getBeansOfType(SequenceBeforeTest.class)).thenReturn(new HashMap<String, SequenceBeforeTest>());
         when(applicationContextMock.getBeansOfType(SequenceAfterTest.class)).thenReturn(new HashMap<String, SequenceAfterTest>());
         MockTestDesigner builder = new MockTestDesigner(applicationContextMock, context) {
             @Override
             public void configure() {
-                sendSoapFault("soapEndpoint")
+                soap().server("soapServer")
+                        .sendFault()
                         .faultCode(FAULT_CODE)
                         .faultString(FAULT_STRING);
             }
@@ -100,21 +107,21 @@ public class SendSoapFaultTestDesignerTest extends AbstractTestNGUnitTest {
 
         TestCase test = builder.getTestCase();
         Assert.assertEquals(test.getActionCount(), 1);
-        Assert.assertEquals(test.getActions().get(0).getClass(), SendSoapFaultAction.class);
+        Assert.assertEquals(test.getActions().get(0).getClass(), DelegatingTestAction.class);
+        Assert.assertEquals(((DelegatingTestAction)test.getActions().get(0)).getDelegate().getClass(), SendSoapFaultAction.class);
 
-        SendSoapFaultAction action = ((SendSoapFaultAction)test.getActions().get(0));
+        SendSoapFaultAction action = (SendSoapFaultAction) ((DelegatingTestAction)test.getActions().get(0)).getDelegate();
         Assert.assertEquals(action.getName(), "send");
 
-        Assert.assertEquals(action.getEndpointUri(), "soapEndpoint");
-        Assert.assertEquals(action.getMessageBuilder().getClass(), PayloadTemplateMessageBuilder.class);
+        Assert.assertEquals(action.getEndpoint(), soapServer);
+        Assert.assertEquals(action.getMessageBuilder().getClass(), StaticMessageContentBuilder.class);
 
-        PayloadTemplateMessageBuilder messageBuilder = (PayloadTemplateMessageBuilder) action.getMessageBuilder();
-        Assert.assertNull(messageBuilder.getPayloadData());
+        StaticMessageContentBuilder messageBuilder = (StaticMessageContentBuilder) action.getMessageBuilder();
+        Assert.assertEquals(messageBuilder.getMessage().getPayload(), "");
         Assert.assertEquals(messageBuilder.getMessageHeaders().size(), 0L);
         Assert.assertNull(action.getFaultActor());
         Assert.assertEquals(action.getFaultCode(), FAULT_CODE);
         Assert.assertEquals(action.getFaultString(), FAULT_STRING);
-
     }
 
     @Test
@@ -122,7 +129,8 @@ public class SendSoapFaultTestDesignerTest extends AbstractTestNGUnitTest {
         MockTestDesigner builder = new MockTestDesigner(applicationContext, context) {
             @Override
             public void configure() {
-                sendSoapFault(soapEndpoint)
+                soap().server(soapServer)
+                        .sendFault()
                         .faultCode(FAULT_CODE)
                         .faultDetailResource(resource)
                         .faultString(FAULT_STRING);
@@ -135,16 +143,17 @@ public class SendSoapFaultTestDesignerTest extends AbstractTestNGUnitTest {
 
         TestCase test = builder.getTestCase();
         Assert.assertEquals(test.getActionCount(), 1);
-        Assert.assertEquals(test.getActions().get(0).getClass(), SendSoapFaultAction.class);
+        Assert.assertEquals(test.getActions().get(0).getClass(), DelegatingTestAction.class);
+        Assert.assertEquals(((DelegatingTestAction)test.getActions().get(0)).getDelegate().getClass(), SendSoapFaultAction.class);
 
-        SendSoapFaultAction action = ((SendSoapFaultAction)test.getActions().get(0));
+        SendSoapFaultAction action = (SendSoapFaultAction) ((DelegatingTestAction)test.getActions().get(0)).getDelegate();
         Assert.assertEquals(action.getName(), "send");
 
-        Assert.assertEquals(action.getEndpoint(), soapEndpoint);
-        Assert.assertEquals(action.getMessageBuilder().getClass(), PayloadTemplateMessageBuilder.class);
+        Assert.assertEquals(action.getEndpoint(), soapServer);
+        Assert.assertEquals(action.getMessageBuilder().getClass(), StaticMessageContentBuilder.class);
 
-        PayloadTemplateMessageBuilder messageBuilder = (PayloadTemplateMessageBuilder) action.getMessageBuilder();
-        Assert.assertNull(messageBuilder.getPayloadData());
+        StaticMessageContentBuilder messageBuilder = (StaticMessageContentBuilder) action.getMessageBuilder();
+        Assert.assertEquals(messageBuilder.getMessage().getPayload(), "");
         Assert.assertEquals(messageBuilder.getMessageHeaders().size(), 0L);
         Assert.assertEquals(action.getFaultDetails().size(), 1L);
         Assert.assertEquals(action.getFaultDetails().get(0), "someDetailData");
@@ -157,7 +166,8 @@ public class SendSoapFaultTestDesignerTest extends AbstractTestNGUnitTest {
         MockTestDesigner builder = new MockTestDesigner(applicationContext, context) {
             @Override
             public void configure() {
-                sendSoapFault(soapEndpoint)
+                soap().server(soapServer)
+                        .sendFault()
                         .faultCode(FAULT_CODE)
                         .faultDetail("DETAIL")
                         .faultString(FAULT_STRING);
@@ -168,16 +178,17 @@ public class SendSoapFaultTestDesignerTest extends AbstractTestNGUnitTest {
 
         TestCase test = builder.getTestCase();
         Assert.assertEquals(test.getActionCount(), 1);
-        Assert.assertEquals(test.getActions().get(0).getClass(), SendSoapFaultAction.class);
+        Assert.assertEquals(test.getActions().get(0).getClass(), DelegatingTestAction.class);
+        Assert.assertEquals(((DelegatingTestAction)test.getActions().get(0)).getDelegate().getClass(), SendSoapFaultAction.class);
 
-        SendSoapFaultAction action = ((SendSoapFaultAction)test.getActions().get(0));
+        SendSoapFaultAction action = (SendSoapFaultAction) ((DelegatingTestAction)test.getActions().get(0)).getDelegate();
         Assert.assertEquals(action.getName(), "send");
 
-        Assert.assertEquals(action.getEndpoint(), soapEndpoint);
-        Assert.assertEquals(action.getMessageBuilder().getClass(), PayloadTemplateMessageBuilder.class);
+        Assert.assertEquals(action.getEndpoint(), soapServer);
+        Assert.assertEquals(action.getMessageBuilder().getClass(), StaticMessageContentBuilder.class);
 
-        PayloadTemplateMessageBuilder messageBuilder = (PayloadTemplateMessageBuilder) action.getMessageBuilder();
-        Assert.assertNull(messageBuilder.getPayloadData());
+        StaticMessageContentBuilder messageBuilder = (StaticMessageContentBuilder) action.getMessageBuilder();
+        Assert.assertEquals(messageBuilder.getMessage().getPayload(), "");
         Assert.assertEquals(messageBuilder.getMessageHeaders().size(), 0L);
         Assert.assertEquals(action.getFaultDetails().size(), 1L);
         Assert.assertEquals(action.getFaultDetails().get(0), "DETAIL");
@@ -190,7 +201,8 @@ public class SendSoapFaultTestDesignerTest extends AbstractTestNGUnitTest {
         MockTestDesigner builder = new MockTestDesigner(applicationContext, context) {
             @Override
             public void configure() {
-                sendSoapFault(soapEndpoint)
+                soap().server(soapServer)
+                        .sendFault()
                         .faultCode(FAULT_CODE)
                         .faultDetailResource("com/consol/citrus/soap/fault.xml")
                         .faultString(FAULT_STRING);
@@ -201,16 +213,17 @@ public class SendSoapFaultTestDesignerTest extends AbstractTestNGUnitTest {
 
         TestCase test = builder.getTestCase();
         Assert.assertEquals(test.getActionCount(), 1);
-        Assert.assertEquals(test.getActions().get(0).getClass(), SendSoapFaultAction.class);
+        Assert.assertEquals(test.getActions().get(0).getClass(), DelegatingTestAction.class);
+        Assert.assertEquals(((DelegatingTestAction)test.getActions().get(0)).getDelegate().getClass(), SendSoapFaultAction.class);
 
-        SendSoapFaultAction action = ((SendSoapFaultAction)test.getActions().get(0));
+        SendSoapFaultAction action = (SendSoapFaultAction) ((DelegatingTestAction)test.getActions().get(0)).getDelegate();
         Assert.assertEquals(action.getName(), "send");
 
-        Assert.assertEquals(action.getEndpoint(), soapEndpoint);
-        Assert.assertEquals(action.getMessageBuilder().getClass(), PayloadTemplateMessageBuilder.class);
+        Assert.assertEquals(action.getEndpoint(), soapServer);
+        Assert.assertEquals(action.getMessageBuilder().getClass(), StaticMessageContentBuilder.class);
 
-        PayloadTemplateMessageBuilder messageBuilder = (PayloadTemplateMessageBuilder) action.getMessageBuilder();
-        Assert.assertNull(messageBuilder.getPayloadData());
+        StaticMessageContentBuilder messageBuilder = (StaticMessageContentBuilder) action.getMessageBuilder();
+        Assert.assertEquals(messageBuilder.getMessage().getPayload(), "");
         Assert.assertEquals(messageBuilder.getMessageHeaders().size(), 0L);
         Assert.assertEquals(action.getFaultDetails().size(), 0L);
         Assert.assertEquals(action.getFaultDetailResourcePaths().size(), 1L);
@@ -224,7 +237,8 @@ public class SendSoapFaultTestDesignerTest extends AbstractTestNGUnitTest {
         MockTestDesigner builder = new MockTestDesigner(applicationContext, context) {
             @Override
             public void configure() {
-                sendSoapFault(soapEndpoint)
+                soap().server(soapServer)
+                        .sendFault()
                         .faultCode(FAULT_CODE)
                         .faultDetail("DETAIL1")
                         .faultDetail("DETAIL2")
@@ -236,16 +250,17 @@ public class SendSoapFaultTestDesignerTest extends AbstractTestNGUnitTest {
 
         TestCase test = builder.getTestCase();
         Assert.assertEquals(test.getActionCount(), 1);
-        Assert.assertEquals(test.getActions().get(0).getClass(), SendSoapFaultAction.class);
+        Assert.assertEquals(test.getActions().get(0).getClass(), DelegatingTestAction.class);
+        Assert.assertEquals(((DelegatingTestAction)test.getActions().get(0)).getDelegate().getClass(), SendSoapFaultAction.class);
 
-        SendSoapFaultAction action = ((SendSoapFaultAction)test.getActions().get(0));
+        SendSoapFaultAction action = (SendSoapFaultAction) ((DelegatingTestAction)test.getActions().get(0)).getDelegate();
         Assert.assertEquals(action.getName(), "send");
 
-        Assert.assertEquals(action.getEndpoint(), soapEndpoint);
-        Assert.assertEquals(action.getMessageBuilder().getClass(), PayloadTemplateMessageBuilder.class);
+        Assert.assertEquals(action.getEndpoint(), soapServer);
+        Assert.assertEquals(action.getMessageBuilder().getClass(), StaticMessageContentBuilder.class);
 
-        PayloadTemplateMessageBuilder messageBuilder = (PayloadTemplateMessageBuilder) action.getMessageBuilder();
-        Assert.assertNull(messageBuilder.getPayloadData());
+        StaticMessageContentBuilder messageBuilder = (StaticMessageContentBuilder) action.getMessageBuilder();
+        Assert.assertEquals(messageBuilder.getMessage().getPayload(), "");
         Assert.assertEquals(messageBuilder.getMessageHeaders().size(), 0L);
         Assert.assertEquals(action.getFaultDetails().size(), 2L);
         Assert.assertEquals(action.getFaultDetails().get(0), "DETAIL1");

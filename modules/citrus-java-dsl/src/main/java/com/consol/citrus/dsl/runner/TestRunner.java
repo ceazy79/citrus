@@ -18,14 +18,11 @@ package com.consol.citrus.dsl.runner;
 
 import com.consol.citrus.*;
 import com.consol.citrus.actions.*;
-import com.consol.citrus.camel.actions.AbstractCamelRouteAction;
+import com.consol.citrus.container.AbstractActionContainer;
 import com.consol.citrus.container.Template;
-import com.consol.citrus.docker.actions.DockerExecuteAction;
 import com.consol.citrus.dsl.builder.*;
-import com.consol.citrus.jms.actions.PurgeJmsQueuesAction;
 import com.consol.citrus.script.GroovyAction;
 import com.consol.citrus.server.Server;
-import com.consol.citrus.ws.actions.SendSoapFaultAction;
 import org.springframework.context.ApplicationContextAware;
 
 import java.util.Date;
@@ -41,6 +38,12 @@ public interface TestRunner extends ApplicationContextAware {
      * @return
      */
     TestCase getTestCase();
+
+    /**
+     * Set test class.
+     * @param type
+     */
+    void testClass(Class<?> type);
 
     /**
      * Set custom test case name.
@@ -115,7 +118,14 @@ public interface TestRunner extends ApplicationContextAware {
      *
      * @param behavior
      */
-    void applyBehavior(TestBehavior behavior);
+    ApplyTestBehaviorAction applyBehavior(TestBehavior behavior);
+
+    /**
+     * Prepare and add a custom container implementation.
+     * @param container
+     * @return
+     */
+    <T extends AbstractActionContainer> AbstractTestContainerBuilder<T> container(T container);
 
     /**
      * Action creating a new test variable during a test.
@@ -207,7 +217,7 @@ public interface TestRunner extends ApplicationContextAware {
      * @param configurer
      * @return
      */
-    PurgeJmsQueuesAction purgeQueues(BuilderSupport<PurgeJmsQueuesBuilder> configurer);
+    TestAction purgeQueues(BuilderSupport<PurgeJmsQueuesBuilder> configurer);
 
     /**
      * Creates a new purge message channel action definition
@@ -242,15 +252,6 @@ public interface TestRunner extends ApplicationContextAware {
      * @return
      */
     SendMessageAction send(BuilderSupport<SendMessageBuilder> configurer);
-
-    /**
-     * Create SOAP fault send message action definition with message endpoint instance. Returns SOAP fault definition with
-     * specific properties for SOAP fault messages.
-     *
-     * @param configurer
-     * @return
-     */
-    SendSoapFaultAction sendSoapFault(BuilderSupport<SendSoapFaultBuilder> configurer);
 
     /**
      * Add sleep action with default delay time.
@@ -323,6 +324,15 @@ public interface TestRunner extends ApplicationContextAware {
      * @return
      */
     StopTimeAction stopTime(String id);
+
+    /**
+     * Creates a new stop time action.
+     *
+     * @param id
+     * @param suffix
+     * @return
+     */
+    StopTimeAction stopTime(String id, String suffix);
 
     /**
      * Creates a new trace variables action definition
@@ -414,6 +424,12 @@ public interface TestRunner extends ApplicationContextAware {
     SequenceBuilder sequential();
 
     /**
+     * Adds async container with nested test actions.
+     * @return
+     */
+    AsyncBuilder async();
+
+    /**
      * Repeat nested test actions based on a timer interval.
      * @return
      */
@@ -436,19 +452,43 @@ public interface TestRunner extends ApplicationContextAware {
      * Run docker command action.
      * @return
      */
-    DockerExecuteAction docker(BuilderSupport<DockerActionBuilder> configurer);
+    TestAction docker(BuilderSupport<DockerActionBuilder> configurer);
 
     /**
-     * Run docker command action.
+     * Run kubernetes command action.
+     * @return
+     */
+    TestAction kubernetes(BuilderSupport<KubernetesActionBuilder> configurer);
+
+    /**
+     * Run selenium command action.
+     * @return
+     */
+    TestAction selenium(BuilderSupport<SeleniumActionBuilder> configurer);
+
+    /**
+     * Run http command action.
      * @return
      */
     TestAction http(BuilderSupport<HttpActionBuilder> configurer);
 
     /**
+     * Run soap command action.
+     * @return
+     */
+    TestAction soap(BuilderSupport<SoapActionBuilder> configurer);
+
+    /**
      * Run Camel route actions.
      * @return
      */
-    AbstractCamelRouteAction camel(BuilderSupport<CamelRouteActionBuilder> configurer);
+    TestAction camel(BuilderSupport<CamelRouteActionBuilder> configurer);
+
+    /**
+     * Run zookeeper command action.
+     * @return
+     */
+    TestAction zookeeper(BuilderSupport<ZooActionBuilder> configurer);
 
     /**
      * Adds template container with nested test actions.

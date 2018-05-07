@@ -17,13 +17,14 @@
 package com.consol.citrus.util;
 
 import com.consol.citrus.Citrus;
+import com.consol.citrus.context.TestContext;
 import com.consol.citrus.exceptions.CitrusRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.ConversionNotSupportedException;
 import org.springframework.beans.SimpleTypeConverter;
 import org.springframework.core.io.InputStreamSource;
-import org.springframework.util.StringUtils;
+import org.springframework.util.*;
 import org.springframework.xml.transform.StringSource;
 import org.w3c.dom.Node;
 
@@ -31,6 +32,7 @@ import javax.xml.transform.Source;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamSource;
 import java.io.*;
+import java.nio.ByteBuffer;
 import java.util.*;
 
 /**
@@ -76,12 +78,30 @@ public abstract class TypeConversionUtils {
             }
         }
 
+        if (MultiValueMap.class.isAssignableFrom(type)) {
+            String mapString = String.valueOf(target);
+
+            Properties props = new Properties();
+            try {
+                props.load(new StringReader(mapString.substring(1, mapString.length() - 1).replaceAll("\\]\\s*", "]\n")));
+            } catch (IOException e) {
+                throw new CitrusRuntimeException("Failed to reconstruct object of type map", e);
+            }
+            MultiValueMap<String, Object> map = new LinkedMultiValueMap<>();
+            for (Map.Entry<Object, Object> entry : props.entrySet()) {
+                String arrayString = String.valueOf(entry.getValue()).replaceAll("^\\[", "").replaceAll("\\]$", "").replaceAll(",\\s", ",");
+                map.add(entry.getKey().toString(), StringUtils.commaDelimitedListToStringArray(String.valueOf(arrayString)));
+            }
+
+            return (T) map;
+        }
+
         if (Map.class.isAssignableFrom(type)) {
             String mapString = String.valueOf(target);
 
             Properties props = new Properties();
             try {
-                props.load(new StringReader(mapString.substring(1, mapString.length() - 1).replace(", ", "\n")));
+                props.load(new StringReader(mapString.substring(1, mapString.length() - 1).replaceAll(",\\s*", "\n")));
             } catch (IOException e) {
                 throw new CitrusRuntimeException("Failed to reconstruct object of type map", e);
             }
@@ -94,20 +114,58 @@ public abstract class TypeConversionUtils {
         }
 
         if (String[].class.isAssignableFrom(type)) {
-            String arrayString = String.valueOf(target).replaceAll("^\\[", "").replaceAll("\\]$", "");
+            String arrayString = String.valueOf(target).replaceAll("^\\[", "").replaceAll("\\]$", "").replaceAll(",\\s", ",");
             return (T) StringUtils.commaDelimitedListToStringArray(String.valueOf(arrayString));
         }
 
         if (List.class.isAssignableFrom(type)) {
-            String listString = String.valueOf(target).replaceAll("^\\[", "").replaceAll("\\]$", "");
+            String listString = String.valueOf(target).replaceAll("^\\[", "").replaceAll("\\]$", "").replaceAll(",\\s", ",");
             return (T) Arrays.asList(StringUtils.commaDelimitedListToStringArray(String.valueOf(listString)));
         }
 
-        if (byte[].class.isAssignableFrom(type) && target instanceof String) {
-            try {
-                return (T) String.valueOf(target).getBytes(Citrus.CITRUS_FILE_ENCODING);
-            } catch (UnsupportedEncodingException e) {
-                return (T) String.valueOf(target).getBytes();
+        if (byte[].class.isAssignableFrom(type)) {
+            if (target instanceof String) {
+                try {
+                    return (T) String.valueOf(target).getBytes(Citrus.CITRUS_FILE_ENCODING);
+                } catch (UnsupportedEncodingException e) {
+                    return (T) String.valueOf(target).getBytes();
+                }
+            } else if (target instanceof ByteBuffer) {
+                return (T) ((ByteBuffer) target).array();
+            } else if (target instanceof ByteArrayInputStream) {
+                try {
+                    return (T) StreamUtils.copyToByteArray((ByteArrayInputStream) target);
+                } catch (IOException e) {
+                    throw new CitrusRuntimeException("Failed to convert input stream to byte[]");
+                }
+            }
+        }
+
+        if (InputStream.class.isAssignableFrom(type)) {
+            if (target instanceof InputStream) {
+                return (T) target;
+            } else if (target instanceof byte[]) {
+                return (T) new ByteArrayInputStream((byte[]) target);
+            } else if (target instanceof String) {
+                try {
+                    return (T) new ByteArrayInputStream(String.valueOf(target).getBytes(Citrus.CITRUS_FILE_ENCODING));
+                } catch (UnsupportedEncodingException e) {
+                    return (T) new ByteArrayInputStream(String.valueOf(target).getBytes());
+                }
+            } else {
+                try {
+                    return (T) new ByteArrayInputStream(target.toString().getBytes(Citrus.CITRUS_FILE_ENCODING));
+                } catch (UnsupportedEncodingException e) {
+                    return (T) new ByteArrayInputStream(target.toString().getBytes());
+                }
+            }
+        }
+
+        if (type.equals(String.class)) {
+            if (ByteBuffer.class.isAssignableFrom(target.getClass())) {
+                return (T) new String(((ByteBuffer) target).array());
+            } else if (byte[].class.isAssignableFrom(target.getClass())) {
+                return (T) Arrays.toString((byte[]) target);
             }
         }
 
@@ -120,6 +178,57 @@ public abstract class TypeConversionUtils {
             }
 
             throw e;
+        }
+    }
+
+    /**
+     * Convert value string to required type.
+     * @param value
+     * @param type
+     * @return
+     */
+    public static <T> T convertStringToType(String value, Class<T> type) {
+        if (type.isAssignableFrom(String.class)) {
+            return (T) value;
+        } else if (type.isAssignableFrom(int.class) || type.isAssignableFrom(Integer.class)) {
+            return (T) Integer.valueOf(value);
+        } else if (type.isAssignableFrom(short.class) || type.isAssignableFrom(Short.class)) {
+            return (T) Short.valueOf(value);
+        }  else if (type.isAssignableFrom(byte.class) || type.isAssignableFrom(Byte.class)) {
+            return (T) Byte.valueOf(value);
+        }  else if (type.isAssignableFrom(long.class) || type.isAssignableFrom(Long.class)) {
+            return (T) Long.valueOf(value);
+        } else if (type.isAssignableFrom(boolean.class) || type.isAssignableFrom(Boolean.class)) {
+            return (T) Boolean.valueOf(value);
+        } else if (type.isAssignableFrom(float.class) || type.isAssignableFrom(Float.class)) {
+            return (T) Float.valueOf(value);
+        } else if (type.isAssignableFrom(double.class) || type.isAssignableFrom(Double.class)) {
+            return (T) Double.valueOf(value);
+        }
+
+        throw new CitrusRuntimeException(String.format("Unable to convert '%s' to required type '%s'", value, type.getName()));
+    }
+
+    /**
+     * Convert value string to required type or read bean of type from application context.
+     * @param value
+     * @param type
+     * @param context
+     * @return
+     */
+    public static <T> T convertStringToType(String value, Class<T> type, TestContext context) {
+        try {
+            return convertStringToType(value, type);
+        } catch (CitrusRuntimeException e) {
+            // try to resolve bean in application context
+            if (context.getApplicationContext() != null && context.getApplicationContext().containsBean(value)) {
+                Object bean = context.getApplicationContext().getBean(value);
+                if (type.isAssignableFrom(bean.getClass())) {
+                    return (T) bean;
+                }
+            }
+
+            throw new CitrusRuntimeException(String.format("Unable to convert '%s' to required type '%s' - also no bean of required type available in application context", value, type.getName()), e.getCause());
         }
     }
 }

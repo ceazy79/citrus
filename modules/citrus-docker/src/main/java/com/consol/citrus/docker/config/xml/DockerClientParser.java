@@ -16,11 +16,13 @@
 
 package com.consol.citrus.docker.config.xml;
 
+import com.consol.citrus.config.xml.AbstractEndpointParser;
 import com.consol.citrus.docker.client.DockerClient;
-import com.github.dockerjava.core.DockerClientConfig;
-import org.springframework.beans.factory.config.BeanDefinition;
+import com.consol.citrus.docker.client.DockerEndpointConfiguration;
+import com.consol.citrus.endpoint.Endpoint;
+import com.consol.citrus.endpoint.EndpointConfiguration;
+import com.github.dockerjava.core.DefaultDockerClientConfig;
 import org.springframework.beans.factory.support.BeanDefinitionBuilder;
-import org.springframework.beans.factory.xml.BeanDefinitionParser;
 import org.springframework.beans.factory.xml.ParserContext;
 import org.w3c.dom.Element;
 
@@ -30,37 +32,40 @@ import org.w3c.dom.Element;
  * @author Christoph Deppisch
  * @since 2.4
  */
-public class DockerClientParser implements BeanDefinitionParser {
+public class DockerClientParser extends AbstractEndpointParser {
 
     @Override
-    @SuppressWarnings({ "unchecked", "rawtypes" })
-    public BeanDefinition parse(Element element, ParserContext parserContext) {
-        BeanDefinitionBuilder builder = BeanDefinitionBuilder.genericBeanDefinition(DockerClient.class);
+    protected void parseEndpointConfiguration(BeanDefinitionBuilder endpointConfiguration, Element element, ParserContext parserContext) {
+        super.parseEndpointConfiguration(endpointConfiguration, element, parserContext);
 
-        DockerClientConfig.DockerClientConfigBuilder config = DockerClientConfig.createDefaultConfigBuilder();
+        DefaultDockerClientConfig.Builder config = DefaultDockerClientConfig.createDefaultConfigBuilder();
 
         if (element.hasAttribute("url")) {
-            config.withUri(element.getAttribute("url"));
+            config.withDockerHost(element.getAttribute("url"));
         }
 
         if (element.hasAttribute("version")) {
-            config.withVersion(element.getAttribute("version"));
+            config.withApiVersion(element.getAttribute("version"));
         }
 
         if (element.hasAttribute("username")) {
-            config.withUsername(element.getAttribute("username"));
+            config.withRegistryUsername(element.getAttribute("username"));
         }
 
         if (element.hasAttribute("password")) {
-            config.withPassword(element.getAttribute("password"));
+            config.withRegistryPassword(element.getAttribute("password"));
         }
 
         if (element.hasAttribute("email")) {
-            config.withEmail(element.getAttribute("email"));
+            config.withRegistryEmail(element.getAttribute("email"));
         }
 
-        if (element.hasAttribute("server-address")) {
-            config.withServerAddress(element.getAttribute("server-address"));
+        if (element.hasAttribute("registry")) {
+            config.withRegistryUrl(element.getAttribute("registry"));
+        }
+
+        if (element.hasAttribute("verify-tls")) {
+            config.withDockerTlsVerify(element.getAttribute("verify-tls"));
         }
 
         if (element.hasAttribute("cert-path")) {
@@ -68,12 +73,19 @@ public class DockerClientParser implements BeanDefinitionParser {
         }
 
         if (element.hasAttribute("config-path")) {
-            config.withDockerCfgPath(element.getAttribute("config-path"));
+            config.withDockerConfig(element.getAttribute("config-path"));
         }
 
-        builder.addPropertyValue("dockerClientConfig", config.build());
-        parserContext.getRegistry().registerBeanDefinition(element.getAttribute("id"), builder.getBeanDefinition());
+        endpointConfiguration.addPropertyValue("dockerClientConfig", config.build());
+    }
 
-        return null;
+    @Override
+    protected Class<? extends Endpoint> getEndpointClass() {
+        return DockerClient.class;
+    }
+
+    @Override
+    protected Class<? extends EndpointConfiguration> getEndpointConfigurationClass() {
+        return DockerEndpointConfiguration.class;
     }
 }

@@ -18,18 +18,17 @@ package com.consol.citrus.dsl.testng;
 
 import com.consol.citrus.*;
 import com.consol.citrus.actions.*;
-import com.consol.citrus.camel.actions.AbstractCamelRouteAction;
+import com.consol.citrus.container.AbstractActionContainer;
 import com.consol.citrus.container.Template;
 import com.consol.citrus.context.TestContext;
-import com.consol.citrus.docker.actions.DockerExecuteAction;
 import com.consol.citrus.dsl.builder.*;
-import com.consol.citrus.dsl.runner.TestRunner;
-import com.consol.citrus.jms.actions.PurgeJmsQueuesAction;
+import com.consol.citrus.dsl.runner.*;
+import com.consol.citrus.dsl.simulation.TestSimulator;
 import com.consol.citrus.script.GroovyAction;
 import com.consol.citrus.server.Server;
-import com.consol.citrus.ws.actions.SendSoapFaultAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationContext;
 
 import java.lang.reflect.Method;
 import java.util.Date;
@@ -41,13 +40,19 @@ import java.util.Date;
  * @author Christoph Deppisch
  * @since 2.3
  */
-public class TestNGCitrusTestRunner extends TestNGCitrusTest implements TestRunner {
+public class TestNGCitrusTestRunner extends TestNGCitrusTest implements TestRunner, TestSimulator {
 
     /** Logger */
     protected final Logger log = LoggerFactory.getLogger(getClass());
 
     /** Test builder delegate */
     private TestRunner testRunner;
+
+    @Override
+    public void simulate(Method method, TestContext context, ApplicationContext applicationContext) {
+        setApplicationContext(applicationContext);
+        testRunner = new TestRunnerSimulation(createTestRunner(method, context).getTestCase(), applicationContext, context);
+    }
 
     @Override
     protected TestRunner createTestRunner(Method method, TestContext context) {
@@ -68,6 +73,11 @@ public class TestNGCitrusTestRunner extends TestNGCitrusTest implements TestRunn
     @Override
     public TestCase getTestCase() {
         return testRunner.getTestCase();
+    }
+
+    @Override
+    public void testClass(Class<?> type) {
+        testRunner.testClass(type);
     }
 
     @Override
@@ -121,8 +131,13 @@ public class TestNGCitrusTestRunner extends TestNGCitrusTest implements TestRunn
     }
 
     @Override
-    public void applyBehavior(com.consol.citrus.dsl.runner.TestBehavior behavior) {
-        testRunner.applyBehavior(behavior);
+    public ApplyTestBehaviorAction applyBehavior(TestBehavior behavior) {
+        return testRunner.applyBehavior(behavior);
+    }
+
+    @Override
+    public <T extends AbstractActionContainer> AbstractTestContainerBuilder<T> container(T container) {
+        return testRunner.container(container);
     }
 
     @Override
@@ -176,7 +191,7 @@ public class TestNGCitrusTestRunner extends TestNGCitrusTest implements TestRunn
     }
 
     @Override
-    public PurgeJmsQueuesAction purgeQueues(BuilderSupport<PurgeJmsQueuesBuilder> configurer) {
+    public TestAction purgeQueues(BuilderSupport<PurgeJmsQueuesBuilder> configurer) {
         return testRunner.purgeQueues(configurer);
     }
 
@@ -198,11 +213,6 @@ public class TestNGCitrusTestRunner extends TestNGCitrusTest implements TestRunn
     @Override
     public SendMessageAction send(BuilderSupport<SendMessageBuilder> configurer) {
         return testRunner.send(configurer);
-    }
-
-    @Override
-    public SendSoapFaultAction sendSoapFault(BuilderSupport<SendSoapFaultBuilder> configurer) {
-        return testRunner.sendSoapFault(configurer);
     }
 
     @Override
@@ -248,6 +258,11 @@ public class TestNGCitrusTestRunner extends TestNGCitrusTest implements TestRunn
     @Override
     public StopTimeAction stopTime(String id) {
         return testRunner.stopTime(id);
+    }
+
+    @Override
+    public StopTimeAction stopTime(String id, String suffix) {
+        return testRunner.stopTime(id, suffix);
     }
 
     @Override
@@ -316,6 +331,11 @@ public class TestNGCitrusTestRunner extends TestNGCitrusTest implements TestRunn
     }
 
     @Override
+    public AsyncBuilder async() {
+        return testRunner.async();
+    }
+
+    @Override
     public TimerBuilder timer() {
         return testRunner.timer();
     }
@@ -331,8 +351,18 @@ public class TestNGCitrusTestRunner extends TestNGCitrusTest implements TestRunn
     }
 
     @Override
-    public DockerExecuteAction docker(BuilderSupport<DockerActionBuilder> configurer) {
+    public TestAction docker(BuilderSupport<DockerActionBuilder> configurer) {
         return testRunner.docker(configurer);
+    }
+
+    @Override
+    public TestAction kubernetes(BuilderSupport<KubernetesActionBuilder> configurer) {
+        return testRunner.kubernetes(configurer);
+    }
+
+    @Override
+    public TestAction selenium(BuilderSupport<SeleniumActionBuilder> configurer) {
+        return testRunner.selenium(configurer);
     }
 
     @Override
@@ -341,8 +371,18 @@ public class TestNGCitrusTestRunner extends TestNGCitrusTest implements TestRunn
     }
 
     @Override
-    public AbstractCamelRouteAction camel(BuilderSupport<CamelRouteActionBuilder> configurer) {
+    public TestAction soap(BuilderSupport<SoapActionBuilder> configurer) {
+        return testRunner.soap(configurer);
+    }
+
+    @Override
+    public TestAction camel(BuilderSupport<CamelRouteActionBuilder> configurer) {
         return testRunner.camel(configurer);
+    }
+
+    @Override
+    public TestAction zookeeper(BuilderSupport<ZooActionBuilder> configurer) {
+        return testRunner.zookeeper(configurer);
     }
 
     @Override
